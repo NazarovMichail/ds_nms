@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-import chardet
 
 
 def parse_requirements(filename):
