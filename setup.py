@@ -5,7 +5,7 @@ import chardet
 ENCODING = None
 def parse_requirements(filename, encoding=None):
     if encoding is None:
-        with open(filename, 'r', encoding='utf-16') as file:
+        with open(filename, 'r', encoding='utf-8') as file:
             return file.read().splitlines()
     with open(filename, 'r', encoding=ENCODING) as file:
         return file.read().splitlines()
