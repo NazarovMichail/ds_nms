@@ -3,10 +3,8 @@ import chardet
 
 
 def parse_requirements(filename):
-    with open(filename, 'rb') as file:
-        raw_data = file.read()
-        result = chardet.detect(raw_data)
-        print(f"Detected encoding: {result['encoding']}")
+    with open(filename, 'r', encoding='windows-1251') as file:
+        return file.read().splitlines()
 
 setup(
     name='ds_nms',
