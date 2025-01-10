@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 def parse_requirements(filename):
-    with open(filename, 'r', encoding='utf-8') as file:
+    with open(filename, 'r', encoding='utf-16') as file:
         return file.read().splitlines()
 
 setup(
