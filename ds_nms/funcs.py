@@ -28,85 +28,6 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import TimeSeriesSplit
 
 
-
-
-
-
-
-
-def kolmog_smirn_test(sample_1: pd.Series,
-                    sample_2: pd.Series,
-                    alpha: float=0.05) -> None:
-    """Тест на то, принадлежат ли две выборки одному и тому же распределению
-
-    Args:
-        sample_1 (pd.Series): Выборка 1
-        sample_2 (pd.Series): Выборка 2
-        alpha (float, optional): Вероятность ошибочно отклонить нулевую гипотезу. Defaults to 0.05.
-    """
-
-    statistic, p_value = kstest(sample_1, sample_2)
-
-    if p_value < alpha:
-        print(f'p-value={p_value:.5f}')
-        print("Гипотеза о равенстве распределения отвергается")
-    else:
-        print(f'p-value={p_value:.5f}')
-        print("Данные могут быть взяты из одного распределения")
-
-
-def kraskel_wallis_test(sample_1: pd.Series,
-                        sample_2: pd.Series,
-                        alpha: float=0.05) -> None:
-    """Тест для сравнения независимых выборок и определения, есть ли статистически значимые различия между ними
-
-    Args:
-        sample_1 (pd.Series): Выборка 1
-        sample_2 (pd.Series): Выборка 2
-        alpha (float, optional): Вероятность ошибочно отклонить нулевую гипотезу. Defaults to 0.05.
-    """
-
-    statistic, p_value = kruskal(sample_1, sample_2)
-    if p_value < alpha:
-        print(f'p-value={p_value:.5f}')
-        print("Гипотеза о равенстве распределения отвергается")
-    else:
-        print(f'p-value={p_value:.5f}')
-        print("Данные могут быть взяты из одного распределения")
-
-
-def df_scaling(df_train: pd.DataFrame,
-            df_test: pd.DataFrame,
-            numerical_columns: List[str],
-            scaler: StandardScaler | MinMaxScaler | Normalizer | RobustScaler,
-            return_scaler: bool = False
-            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-    df_train_inx = df_train.index
-    df_test_inx = df_test.index
-
-    df_train_num = df_train[numerical_columns]
-    df_test_num = df_test[numerical_columns]
-
-    train_scaler = scaler
-    train_scaler.fit(df_train_num)
-
-    array_train_num_scaled = train_scaler.transform(df_train_num)
-    array_test_num_scaled = train_scaler.transform(df_test_num)
-
-    df_train_num_scaled = pd.DataFrame(array_train_num_scaled, columns=numerical_columns, index=df_train_inx)
-    df_test_num_scaled = pd.DataFrame(array_test_num_scaled, columns=numerical_columns, index=df_test_inx)
-
-    print(df_train_num_scaled.shape, df_test_num_scaled.shape)
-    display(df_train_num_scaled.describe().round(1))
-    display(df_test_num_scaled.describe().round(1))
-
-    if return_scaler:
-        return df_train_num_scaled, df_test_num_scaled, train_scaler
-
-    return df_train_num_scaled, df_test_num_scaled
-
-
 def save_data(
             file_dict: Dict[str, Any],
             dir: str,
@@ -143,64 +64,6 @@ def load_data(
         except FileNotFoundError as error:
             print(error)
     return loaded_lst
-
-
-def drop_outliers_iso(X: pd.DataFrame, y: pd.Series,
-                contamination: float=0.04,
-                n_estimators: int=100) -> Tuple[pd.DataFrame,pd.DataFrame, pd.DataFrame]:
-
-    columns_list = list(X.columns)
-    BEFORE_SHAPE = X.shape[0]
-
-    irf = IsolationForest(contamination=contamination,
-                    n_estimators=n_estimators,
-                    random_state=1)
-    irf.fit(X.values)
-    prediction = irf.predict(X.values)
-
-    clear_inx = np.where(prediction == 1)
-    outlier_inx = np.where(prediction == -1)
-
-    X_cleared = X.to_numpy()[clear_inx]
-    y_cleared = y.to_numpy()[clear_inx]
-    outliers = X.to_numpy()[outlier_inx]
-
-    AFTER_SHAPE = X_cleared.shape[0]
-
-    print(f"Удалено {BEFORE_SHAPE - AFTER_SHAPE} объектов")
-
-    return pd.DataFrame(X_cleared, columns=columns_list).set_index(list(clear_inx)),\
-        pd.DataFrame(y_cleared).set_index(list(clear_inx)),\
-    pd.DataFrame(outliers, columns=columns_list, index=list(outlier_inx))
-
-
-def drop_outliers_tuk(data: pd.DataFrame,
-                feature : str,
-                left:float=1.5, right:float=1.5,
-                log_scale:bool=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Очищает датафрейм от выбросов по методу Тьюки
-
-    Args:
-        data (pd.DataFrame): датафрейм
-        feature (str): столбец
-        left (float, optional): число влево от IQR. Defaults to 1.5.
-        right (float, optional): число вправо от IQR. Defaults to 1.5.
-
-    Returns:
-        tuple: датафрейм с выбросами,
-        очищенный датафрейм от выбросов
-    """
-    if log_scale:
-        x = np.log(data[feature]+1)
-    else:
-        x = data[feature]
-    quant_25, quant_75 = x.quantile(0.25), x.quantile(0.75)
-    IQR = quant_75 - quant_25
-    bond_low = quant_25 - IQR * left
-    bond_up = quant_75 + IQR * right
-    outliers = data[ (x < bond_low )| (x > bond_up )]
-    cleaned_data = data[(x >= bond_low) & (x <= bond_up)]
-    return cleaned_data, outliers
 
 
 def get_selected_features(X: pd.DataFrame,
@@ -1564,17 +1427,7 @@ def get_transform_feature(X_train: pd.DataFrame, X_test: pd.DataFrame,
     return df_trans_train, df_trans_test
 
 
-def get_duplicated_df(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
-    dupl_df = df.duplicated(subset=[column])
-
-    dupl_values = df.loc[dupl_df, column].values
-    dupl_values_set = set(dupl_values)
-
-    result_df = df[df[column].isin(dupl_values_set)]
-
-    result_df = result_df.sort_values(by=column)
-    return result_df
 
 
 def get_polyfeatures(X_train: pd.DataFrame, X_test: pd.DataFrame,
