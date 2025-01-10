@@ -1,9 +1,12 @@
 from setuptools import setup, find_packages
+import chardet
 
 
 def parse_requirements(filename):
-    with open(filename, 'r', encoding='windows-1252') as file:
-        return file.read().splitlines()
+    with open(filename, 'rb') as file:
+        raw_data = file.read()
+        result = chardet.detect(raw_data)
+        print(f"Detected encoding: {result['encoding']}")
 
 setup(
     name='ds_nms',
