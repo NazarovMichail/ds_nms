@@ -106,3 +106,34 @@ def load_data(
             print(f"Ошибка при загрузке файла {file_path}: {error}")
 
     return loaded_lst
+
+def save_split_description(df_initial: pd.DataFrame,
+                    initial_columns: List[str],
+                    target: pd.Series,
+                    df_name: str,
+                    directory: str='data',
+                    ) -> None:
+    """Сохраняет датафрейм с выбранными индексами целевой переменной и выбранными столбцами
+
+    Args:
+        df_initial (pd.DataFrame): Исходный датафрейм
+        initial_columns (List[str]): Столбцы для нового датафрейма
+        target (pd.Series): Целевая переменная
+        df_name (str): Имя нового датафрейма
+        directory (str, optional): Директория для сохранения нового датафрейма. Defaults to 'data'.
+
+    Raises:
+        ValueError: Ошибка, если колонки отсутсвуют в исходном датафрейме
+    """
+    missing_columns = set(initial_columns) - set(df_initial.columns)
+    if missing_columns:
+        raise ValueError(f"Следующие колонки отсутствуют в датафрейме: {missing_columns}")
+
+    os.makedirs(directory, exist_ok=True)
+
+    file_path = os.path.join(directory, f"{df_name}_descr.pkl")
+
+    df_description = df_initial.loc[target.index, initial_columns]
+    df_description.to_pickle(file_path)
+
+    print(f"Файл {file_path} сохранен!")

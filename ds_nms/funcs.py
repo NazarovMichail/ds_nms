@@ -28,42 +28,7 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import TimeSeriesSplit
 
 
-def save_data(
-            file_dict: Dict[str, Any],
-            dir: str,
-            store: str='data/',
-            ) -> None:
 
-
-    for file_name, data in file_dict.items():
-        try:
-            with open(f'{store}{dir}{file_name}.pkl', 'wb') as file:
-                pickle.dump(data, file)
-                print(f'Файл {file.name} записан')
-        except FileNotFoundError as error:
-            print(error)
-            os.mkdir(f'{store}{dir}')
-            with open(f'{store}{dir}{file_name}.pkl', 'wb') as file:
-                pickle.dump(data, file)
-                print(f'Файл {file.name} записан')
-
-
-def load_data(
-            file_lst: List[str],
-            dir: str,
-            store: str='data/',
-            ) -> List[Any]:
-
-    loaded_lst = []
-    for file_name in file_lst:
-        try:
-            with open(f'{store}{dir}{file_name}.pkl', 'rb') as file:
-                loaded_file = pickle.load(file)
-                loaded_lst.append(loaded_file)
-                print(f'Файл {file.name} загружен')
-        except FileNotFoundError as error:
-            print(error)
-    return loaded_lst
 
 
 def get_selected_features(X: pd.DataFrame,
