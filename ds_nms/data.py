@@ -142,7 +142,7 @@ def df_scaling(df_train: pd.DataFrame,
         return_scaler (bool, optional): Если True, возвращает scaler. Defaults to False.
 
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: _description_
+        Tuple[pd.DataFrame, pd.DataFrame]:  Масштабированные тренировочные и тестовые данные, опционально scaler.
     """
     df_train_inx = df_train.index
     df_test_inx = df_test.index
@@ -243,3 +243,136 @@ def drop_outliers_tuk(X: pd.DataFrame, y: pd.Series,
     print(f"Удалено {outlier_mask.sum()} объектов из {X.shape[0]}")
 
     return cleaned_data, cleaned_y, outliers_data
+
+def get_pca(X_train: pd.DataFrame, X_test: pd.DataFrame,
+            columns_pca: Dict[str, List[str]],
+            n_components: int=1) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Преобразует указанные группы признаков с использованием PCA и добавляет результат как новые столбцы
+
+    Args:
+        X_train (pd.DataFrame): Тренировочный набор данных
+        X_test (pd.DataFrame): Тестовый набор данных
+        columns_pca (Dict[str, List[str]]): Словарь, где ключ - имя нового признака,
+                                            значение - список столбцов для PCA.
+        n_components (int, optional): Количество компонент для PCA. Defaults to 1.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: Кортеж преобразованных тренировочных и тестовых наборов данных
+    """
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+
+    for column_name, columns_lst in columns_pca.items():
+        pca = PCA(n_components=n_components)
+
+        train_arr = pca.fit_transform(X_train.loc[:, columns_lst])
+        test_arr = pca.transform(X_test.loc[:, columns_lst])
+
+        X_train[column_name] = train_arr[:, 0] if n_components == 1 else train_arr
+        X_test[column_name] = test_arr[:, 0] if n_components == 1 else test_arr
+
+        X_train.drop(columns=columns_lst, inplace=True)
+        X_test.drop(columns=columns_lst, inplace=True)
+
+    return X_train, X_test
+
+def get_VIF(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Вычисляет факторы инфляции дисперсии (VIF) для каждого столбца в датафрейме.
+
+    Args:
+        df (pd.DataFrame): Датафрейм с числовыми признаками.
+
+    Returns:
+        pd.DataFrame: Датафрейм с именами столбцов и их значениями VIF.
+    """
+
+    df = df.copy()
+    df["const"] = 1
+
+    vif_data = pd.DataFrame({
+        "Feature": df.columns,
+        "VIF": [variance_inflation_factor(df.values, i) for i in range(df.shape[1])]
+    }, index=df.columns)
+
+    # Исключаем VIF для константы
+    vif_data = vif_data[vif_data["Feature"] != "const"].sort_values(by="VIF", ascending=False)
+
+    display(vif_data[["VIF"]].sort_values(by="VIF", ascending=False).T)
+
+    return vif_data
+
+def plot_corrmatrix(df: pd.DataFrame,
+                    target: pd.Series=None,
+                    calc_det: bool = False,
+                    method: str = 'pearson') -> None:
+    """
+    Строит тепловую карту корреляционной матрицы с дополнительной информацией (ранг и детерминант).
+
+    Args:
+        df (pd.DataFrame): Датафрейм с данными.
+        target (pd.Series): Целевая переменная Defaults to None.
+        calc_det (bool, optional): Вычислять ранг и детерминант корреляционной матрицы. Defaults to False.
+        method (str, optional): Метод вычисления корреляции ('pearson', 'kendall', 'spearman'). Defaults to 'pearson'.
+
+    Returns:
+        None
+    """
+
+    if target is None:
+        corr_matrix = df.corr(method=method)
+    else:
+        df = pd.concat((df, target), axis=1)
+        corr_matrix = df.corr(method=method)
+
+    fig = plt.figure(figsize=(corr_matrix.shape[0], corr_matrix.shape[1]))
+    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", cbar=True, square=False)
+    plt.title(f'Корреляционная матрица ({method})', fontsize=14)
+    plt.show()
+
+    if calc_det:
+        if target is None:
+            rank = np.linalg.matrix_rank(corr_matrix)
+            determinant = np.linalg.det(corr_matrix)
+            print(f'Ранг корреляционной матрицы: {rank}')
+            print(f'Размер корреляционной матрицы: {corr_matrix.shape[0]}x{corr_matrix.shape[1]}')
+            print(f'Детерминант корреляционной матрицы: {determinant:.3f}')
+        else:
+            corr_matrix = corr_matrix.iloc[:-1, :-1]
+            rank = np.linalg.matrix_rank(corr_matrix)
+            determinant = np.linalg.det(corr_matrix)
+            print(f'Ранг корреляционной матрицы: {rank}')
+            print(f'Размер корреляционной матрицы: {corr_matrix.shape[0]}x{corr_matrix.shape[1]}')
+            print(f'Детерминант корреляционной матрицы: {determinant:.3f}')
+
+
+def get_polyfeatures(X_train: pd.DataFrame,
+                    X_test: pd.DataFrame,
+                    degree: int = 2) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Создаёт полиномиальные признаки для тренировочного и тестового наборов.
+
+    Args:
+        X_train (pd.DataFrame): Датафрейм с тренировочными данными.
+        X_test (pd.DataFrame): Датафрейм с тестовыми данными.
+        degree (int, optional): Степень полинома. Defaults to 2.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]:
+            - Тренировочный набор с полиномиальными признаками.
+            - Тестовый набор с полиномиальными признаками.
+    """
+
+    col_names = list(X_train.columns)
+
+    poly = PolynomialFeatures(degree=degree, include_bias=False)
+    poly.fit(X_train)
+    X_train_poly_arr = poly.transform(X_train)
+    X_test_poly_arr = poly.transform(X_test)
+
+    df_columns = poly.get_feature_names_out(col_names)
+
+    X_train_poly = pd.DataFrame(X_train_poly_arr, columns=df_columns, index=X_train.index)
+    X_test_poly = pd.DataFrame(X_test_poly_arr, columns=df_columns, index=X_test.index)
+
+    return X_train_poly, X_test_poly

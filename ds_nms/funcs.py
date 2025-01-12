@@ -1087,30 +1087,6 @@ def get_best_study_params(study: optuna.study.study.Study, threshold: float | in
     return params
 
 
-def plot_corrmatrix(df: pd.DataFrame,
-                    drop_last: int=None,
-                    calc_det: bool=False,
-                    method: str='pearson'
-                    ) -> None:
-
-    MATRIX_SIZE = df.shape[1]
-
-    if drop_last is None:
-        corr_matrix = df.corr()
-
-    else:
-        corr_matrix = df.iloc[:, :-drop_last].corr(method)
-
-    fig = plt.figure(figsize=(MATRIX_SIZE, MATRIX_SIZE))
-    sns.heatmap(corr_matrix,annot=True,cmap=[ 'blue','lightblue','white','pink', 'red', 'darkred', 'black'])
-    if calc_det:
-        c_m_rank = np.linalg.matrix_rank(corr_matrix)
-        c_m_det = np.linalg.det(corr_matrix)
-
-        print(f'Ранг корреляционной матрицы = {c_m_rank} | Размер корреляционной матрицы {corr_matrix.shape[0]}')
-        print(f'Детерминант корреляционной матрицы = {c_m_det:.3f}')
-
-
 def get_total_data(X_train: pd.DataFrame, y_train: pd.Series,
                 X_test: pd.DataFrame, y_test: pd.Series) -> pd.DataFrame:
     total_train = pd.concat([X_train, y_train], axis=1)
@@ -1146,27 +1122,6 @@ def get_test_metrics(X_train: pd.DataFrame, y_train: pd.Series,
     display(result_all)
 
     return y_pred_df, result_test, result_all
-
-
-def get_pca(X_train: pd.DataFrame, X_test: pd.DataFrame,
-            columns_pca: Dict[str, List[str]]) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-    X_train = X_train.copy()
-    X_test = X_test.copy()
-
-    for column_name, columns_lst in columns_pca.items():
-        pca = PCA(n_components=1)
-
-        train_arr = pca.fit_transform(X_train.loc[:, columns_lst])
-        test_arr = pca.transform(X_test.loc[:, columns_lst])
-
-        X_train[column_name] = train_arr
-        X_test[column_name] = test_arr
-
-        X_train = X_train.drop(columns=columns_lst)
-        X_test = X_test.drop(columns=columns_lst)
-
-    return X_train, X_test
 
 
 def df_encoding(
@@ -1429,23 +1384,6 @@ def get_transform_feature(X_train: pd.DataFrame, X_test: pd.DataFrame,
 
 
 
-
-def get_polyfeatures(X_train: pd.DataFrame, X_test: pd.DataFrame,
-                    degree: int=2) -> Tuple[ pd.DataFrame, pd.DataFrame]:
-
-    col_names = list(X_train.columns)
-
-    poly = PolynomialFeatures(degree=degree, include_bias = False)
-    poly_fit = poly.fit(X_train)
-    X_train_poly_arr = poly_fit.transform(X_train)
-    X_test_poly_arr = poly_fit.transform(X_test)
-
-    df_columns = poly_fit.get_feature_names_out(col_names)
-
-    X_train_poly = pd.DataFrame(X_train_poly_arr, columns=df_columns)
-    X_test_poly = pd.DataFrame(X_test_poly_arr, columns=df_columns)
-
-    return X_train_poly, X_test_poly
 
 
 def plot_ts_pred(y_train: pd.Series,
