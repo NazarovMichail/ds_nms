@@ -31,61 +31,10 @@ from sklearn.model_selection import TimeSeriesSplit
 
 
 
-def get_selected_features(X: pd.DataFrame,
-            y: pd.Series,
-            selector: RFE | SequentialFeatureSelector,
-            estimator: BaseEstimator,
-            n_features_to_select=None
-            ) -> Tuple[pd.DataFrame, RFE | SequentialFeatureSelector]:
-
-    selector_init = selector(estimator=estimator, n_features_to_select=n_features_to_select)
-    selector_trained = selector_init.fit(X, y)
-    selected_inx = selector_trained.support_
-    selected_columns = list(X.columns[selected_inx])
-    result_df = pd.DataFrame(selector_trained.transform(X), columns=selected_columns)
-
-    return result_df, selector_trained
 
 
-def get_best_n_features(
-                        X: pd.DataFrame,
-                        y: pd.Series,
-                        selector: RFE | SequentialFeatureSelector,
-                        scoring: dict,
-                        estimator: BaseEstimator,
-                        X_name: str,
-                        ) -> Tuple[int, optuna.Study]:
 
-    samples_num = X.shape[1]
-    def objective(trial):
 
-        n_features_to_select = trial.suggest_int("n_features_to_select", 1, samples_num)
-
-        X_reduced, _ = get_selected_features(X, y,
-                    selector,
-                    estimator,
-                    n_features_to_select=n_features_to_select)
-
-        result = cross_validate(estimator,
-                            X_reduced,
-                            y, scoring=list(scoring.values()),
-                            cv=KFold(4),
-                            return_estimator=True
-                            )
-
-        return -result['test_neg_root_mean_squared_error'].mean()
-
-    grid = {'n_features_to_select': range(1, samples_num)}
-    study = optuna.create_study(study_name=f"{estimator}_{X_name}_study",
-                            direction="minimize",
-                            sampler=optuna.samplers.GridSampler(grid),
-                            )
-    study.optimize(objective, n_trials=samples_num)
-    trial = study.best_trial
-    params = trial.params
-    selected_n_features = params['n_features_to_select']
-
-    return selected_n_features, study
 
 
 def save_selected_features(data_dict: Dict[str, Tuple[pd.DataFrame, pd.Series]],
