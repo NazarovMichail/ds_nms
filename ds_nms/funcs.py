@@ -30,46 +30,6 @@ from sklearn.model_selection import TimeSeriesSplit
 
 
 
-
-
-
-
-
-
-
-def save_selected_features(data_dict: Dict[str, Tuple[pd.DataFrame, pd.Series]],
-                            selector: RFE | SequentialFeatureSelector,
-                            estimators_lst: List[BaseEstimator],
-                            scoring: Dict[str, str],
-                            dir: str
-                            ):
-
-    X_selected_dict = {}
-    X_selected_names_lst = []
-
-    progress_bar = tqdm(estimators_lst)
-    for estimator in progress_bar:
-        data_progress_bar = tqdm(data_dict.items())
-        for data_name, data in data_progress_bar:
-            X, y = data
-            selected_n_features, _ = get_best_n_features(X, y, selector, scoring, estimator, data_name)
-            X_selected, selector_trained  = get_selected_features(X, y, selector, estimator, selected_n_features)
-
-            X_name = f'{data_name}_{estimator}'
-
-            X_selected_dict[X_name] = X_selected
-            X_selected_names_lst.append(X_name)
-
-            clear_output()
-
-    X_names_dict = {'Selected_features_names': X_selected_names_lst }
-    dir = f'{dir}{dt.now().strftime("%Y_%m_%d_%H_%M")}/'
-
-    clear_output()
-    save_data(X_selected_dict, dir)
-    save_data(X_names_dict, dir)
-
-
 def train_stratify_cv(
                     X: pd.DataFrame,
                     y: pd.Series,
