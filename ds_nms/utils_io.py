@@ -69,7 +69,7 @@ def load_data(
         file_lst: List[str],
         sub_dir: str,
         directory: str = 'data/',
-        format: str = 'pkl') -> List[Any]:
+        load_format: str = 'pkl') -> List[Any]:
     """
     Загружает данные из указанных файлов.
 
@@ -86,16 +86,16 @@ def load_data(
     final_dir = os.path.join(directory, sub_dir)
 
     for file_name in file_lst:
-        file_path = os.path.join(final_dir, f"{file_name}.{format}")
+        file_path = os.path.join(final_dir, f"{file_name}.{load_format}")
         try:
-            if format == 'pkl':
+            if load_format == 'pkl':
                 with open(file_path, 'rb') as file:
                     loaded_file = pickle.load(file)
-            elif format == 'json':
+            elif load_format == 'json':
                 with open(file_path, 'r', encoding='utf-8') as file:
                     loaded_file = json.load(file)
             else:
-                raise ValueError(f"Неподдерживаемый формат: {format}")
+                raise ValueError(f"Неподдерживаемый формат: {load_format}")
 
             loaded_lst.append(loaded_file)
             print(f"Файл {file_path} успешно загружен.")
