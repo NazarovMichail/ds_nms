@@ -63,14 +63,40 @@ def get_feature_importance_df(X: pd.DataFrame, model: BaseEstimator) -> pd.DataF
 
     return feature_importances_df
 
+def relative_error(y_pred: np.array,
+            y_true: pd.Series,
+            re_threshold: int=30) -> int:
+    """Вычисляет долю объектов с относительной ошибкой меньше порогового значения
+
+    Args:
+        y_pred (np.array): Вектор предсказанных целевых переменных
+        y_true (pd.Series): Вектор действительных целевых переменных
+        re_threshold (int, optional): Пороовое значение относительной ошибки. Defaults to 30.
+
+    Returns:
+        int: Доля объектов, для которых значения относительной ошибки меньше порогового значения
+    """
+
+    re = abs(y_pred - y_true)
+    re_relative = (re / (y_pred + 1e-8)) * 100
+    count_less_thresh = re_relative[re_relative < re_threshold].shape[0]
+    count_less_thresh_ratio = count_less_thresh / y_true.shape[0]
+
+    return count_less_thresh_ratio
+
 def get_prediction(
     X: pd.DataFrame,
     y: pd.Series,
     model: BaseEstimator,
-    re_n: int = 30
+    re_threshold: int = 30
 ) -> Tuple[pd.DataFrame, np.ndarray]:
-    """ Возвращает датафрейм с метриками (R2, RMSE, MAE, NRMSE, RE, negative)
-    и массив предсказаний модели.
+    """Возвращает датафрейм с метриками и массив предсказаний модели.
+
+    Args:
+        X (pd.DataFrame): Датафрейм для предсказания
+        y (pd.Series): Целевая переменная
+        model (BaseEstimator): Обученная модель
+        re_threshold (int, optional): Пороовое значение относительной ошибки. Defaults to 30.
 
     Returns:
         Tuple[pd.DataFrame, np.ndarray]: Кортеж датафрейма с метриками и массив предсказаний модели
@@ -79,36 +105,32 @@ def get_prediction(
 
     RMSE = root_mean_squared_error(y, y_pred)
     MAE = mean_absolute_error(y, y_pred)
+    RE = relative_error(y_pred=y_pred,
+                        y_true=y,
+                        re_threshold=re_threshold)
     negative = (y_pred < 0).sum()
 
     metrics_dict = {
-        "RMSE": RMSE.round(2),
-        "MAE": MAE.round(2),
-        "negative": negative
+        "RMSE": RMSE,
+        "MAE": MAE,
+        "RE": RE,
+        "negative": negative,
     }
 
     # Проверяем, что в выборке больше 1 точки (иначе r2_score не посчитать)
     if y_pred.shape[0] > 1:
         R2 = r2_score(y, y_pred)
         # Чтобы избежать деления на ноль:
-        denom = (y.max() - y.min()).round(3)
+        denom = (y.max() - y.min())
         if denom == 0:
             NRMSE = np.nan
         else:
             NRMSE = RMSE / denom
         metrics_dict["R2"] = R2
-        metrics_dict["NRMSE"] = round(NRMSE, 2)
-
-    re = (y_pred - y).abs()
-    re_relative = (re / (y_pred + 1e-8)) * 100
-    count_less_n = re_relative[re_relative < re_n].shape[0]
-    re_less_n = count_less_n / y.shape[0]
-
-    metrics_dict["RE"] = re_less_n
+        metrics_dict["NRMSE"] = NRMSE
 
     metrics_df = pd.DataFrame(metrics_dict, index=[0])
     return metrics_df, y_pred
-
 
 def train_cv(
     X: pd.DataFrame,
@@ -300,11 +322,25 @@ def train_cv(
         # Для 'ts' — последняя
         best_model = models_history[-1]
 
-    else:
+    if cv_type == "loo":
         # Логика выбора "лучшей": к примеру, минимизируем MAE_val
-        best_score_ind = results_dict[metric_best].argmin()
-        best_model = models_history[best_score_ind]
-
+        if metric_best in ('RMSE_val', 'MAE_val', 'RE_val' ):
+            if metric_best in ('RMSE_val', 'MAE_val'):
+                best_score_ind = results_dict[metric_best].argmin()
+                best_model = models_history[best_score_ind]
+            else:
+                best_score_ind = results_dict[metric_best].argmax()
+                best_model = models_history[best_score_ind]
+        else:
+            raise ValueError("""Для LOO метрика выбора лучшей модели (metric_best)
+                должна быть: RMSE_val, MAE_val, RE_val""")
+    else:
+        if metric_best in ('RMSE_val', 'MAE_val'):
+            best_score_ind = results_dict[metric_best].argmin()
+            best_model = models_history[best_score_ind]
+        else:
+            best_score_ind = results_dict[metric_best].argmax()
+            best_model = models_history[best_score_ind]
     # -------------------------- #
     # 4. Сводный словарь с результатами
     # -------------------------- #
@@ -314,32 +350,50 @@ def train_cv(
     }
 
     for key, values in results_dict.items():
-        final_result[f'{key}_mean'] = np.nanmean(values).round(3)
+        final_result[f'{key}_mean_macro'] = np.nanmean(values).round(3)
         final_result[f'{key}_std'] = np.nanstd(values).round(3)
         final_result[f'{key}_splits'] = np.round(values, 3)
 
     y_val_concat = pd.concat(y_val_full).values
     y_pred_concat = np.concatenate(y_pred_full)
     if len(y_val_concat) > 1:
-        final_result['R2_val_global'] = r2_score(y_val_concat, y_pred_concat)
-        final_result['RMSE_val_global'] = root_mean_squared_error(
+        final_result['R2_val_micro'] = r2_score(y_val_concat, y_pred_concat)
+        final_result['RMSE_val_micro'] = root_mean_squared_error(
             y_val_concat, y_pred_concat
         )
-        final_result['MAE_val_global'] = mean_absolute_error(
+        final_result['MAE_val_micro'] = mean_absolute_error(
             y_val_concat, y_pred_concat
         )
+        final_result['RE_val_micro'] = relative_error(y_pred=y_pred_concat,
+                               y_true=y_val_concat)
+        final_result['Negative_micro'] = (y_pred_concat < 0).sum()
         val_denom = (y_val_concat.max() - y_val_concat.min())
         if val_denom == 0:
-            final_result['NRMSE_val_global'] = np.nan
+            final_result['NRMSE_val_micro'] = np.nan
         else:
-            final_result['NRMSE_val_global'] = (
-                final_result['RMSE_val_global'] / val_denom
+            final_result['NRMSE_val_micro'] = (
+                final_result['RMSE_val_micro'] / val_denom
             )
     else:
-        final_result['R2_val_global'] = np.nan
-        final_result['RMSE_val_global'] = np.nan
-        final_result['MAE_val_global'] = np.nan
-        final_result['NRMSE_val_global'] = np.nan
+        final_result['R2_val_micro'] = np.nan
+        final_result['RMSE_val_micro'] = np.nan
+        final_result['MAE_val_micro'] = np.nan
+        final_result['RE_val_micro'] = np.nan
+        final_result['NRMSE_val_micro'] = np.nan
+
+    # Метрики разности валидационных значений и обучающих
+    if cv_type == 'loo':
+        R2_diff = abs(final_result['R2_train_mean_macro'] - final_result['R2_val_micro'])
+        RMSE_diff = abs(final_result['RMSE_train_mean_macro'] - final_result['RMSE_val_micro'])
+        MAE_diff = abs(final_result['MAE_train_mean_macro'] - final_result['MAE_val_micro'])
+    else:
+        R2_diff = (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean()
+        RMSE_diff = abs(final_result['RMSE_train_splits'] - final_result['RMSE_val_splits']).mean()
+        MAE_diff = abs(final_result['MAE_train_splits'] - final_result['MAE_val_splits']).mean()
+
+    final_result['R2_diff_rel'] = R2_diff / final_result['R2_train_mean_macro']
+    final_result['RMSE_diff_rel'] = RMSE_diff / final_result['RMSE_train_mean_macro']
+    final_result['MAE_diff_rel'] = MAE_diff / final_result['MAE_train_mean_macro']
 
     clear_output()
 
