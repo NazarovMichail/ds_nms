@@ -350,7 +350,7 @@ def train_cv(
     }
 
     for key, values in results_dict.items():
-        final_result[f'{key}_mean_macro'] = np.nanmean(values).round(3)
+        final_result[f'{key}_macro'] = np.nanmean(values).round(3)
         final_result[f'{key}_std'] = np.nanstd(values).round(3)
         final_result[f'{key}_splits'] = np.round(values, 3)
 
@@ -383,17 +383,17 @@ def train_cv(
 
     # Метрики разности валидационных значений и обучающих
     if cv_type == 'loo':
-        R2_diff = abs(final_result['R2_train_mean_macro'] - final_result['R2_val_micro'])
-        RMSE_diff = abs(final_result['RMSE_train_mean_macro'] - final_result['RMSE_val_micro'])
-        MAE_diff = abs(final_result['MAE_train_mean_macro'] - final_result['MAE_val_micro'])
+        R2_diff = abs(final_result['R2_train_macro'] - final_result['R2_val_micro'])
+        RMSE_diff = abs(final_result['RMSE_train_macro'] - final_result['RMSE_val_micro'])
+        MAE_diff = abs(final_result['MAE_train_macro'] - final_result['MAE_val_micro'])
     else:
         R2_diff = (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean()
         RMSE_diff = abs(final_result['RMSE_train_splits'] - final_result['RMSE_val_splits']).mean()
         MAE_diff = abs(final_result['MAE_train_splits'] - final_result['MAE_val_splits']).mean()
 
-    final_result['R2_diff_rel'] = R2_diff / final_result['R2_train_mean_macro']
-    final_result['RMSE_diff_rel'] = RMSE_diff / final_result['RMSE_train_mean_macro']
-    final_result['MAE_diff_rel'] = MAE_diff / final_result['MAE_train_mean_macro']
+    final_result['R2_diff_rel'] = R2_diff / final_result['R2_train_macro']
+    final_result['RMSE_diff_rel'] = RMSE_diff / final_result['RMSE_train_macro']
+    final_result['MAE_diff_rel'] = MAE_diff / final_result['MAE_train_macro']
 
     clear_output()
 
