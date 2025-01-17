@@ -42,29 +42,29 @@ def get_best_study_params(study: optuna.study.study.Study,
         print("Нет валидных строк после удаления +/- inf из 'values_0' и 'values_1'.")
         return None
 
-    if direction_1 == "minimize":
-        filtered_df_1 = results_df[results_df['values_0'] < threshold]
+    if direction_2 == "minimize":
+        filtered_df_1 = results_df[results_df['values_1'] < threshold]
     else:
-        filtered_df_1 = results_df[results_df['values_0'] > threshold]
+        filtered_df_1 = results_df[results_df['values_1'] > threshold]
 
-    if direction_2 == "maximize":
-        best_results = filtered_df_1[filtered_df_1['values_1'] == filtered_df_1['values_1'].max()]
+    if direction_1 == "maximize":
+        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].max()]
     else:
-        best_results = filtered_df_1[filtered_df_1['values_1'] == filtered_df_1['values_1'].min()]
+        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].min()]
     try:
         best_ind = best_results.index[0]
         params = study.get_trials()[best_ind].params
     except IndexError as error:
         print(error)
         try:
-            if direction_1 == "minimize":
-                filtered_df_1 = results_df[results_df['values_0'] == results_df['values_0'].min() ]
+            if direction_2 == "minimize":
+                filtered_df_1 = results_df[results_df['values_1'] == results_df['values_1'].min() ]
             else:
-                filtered_df_1 = results_df[results_df['values_0'] == results_df['values_0'].max()]
-            if direction_2 == "maximize":
-                best_results = filtered_df_1[filtered_df_1['values_1'] == filtered_df_1['values_1'].min()]
+                filtered_df_1 = results_df[results_df['values_1'] == results_df['values_1'].max()]
+            if direction_1 == "maximize":
+                best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].min()]
             else:
-                best_results = filtered_df_1[filtered_df_1['values_1'] == filtered_df_1['values_1'].max()]
+                best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].max()]
 
             best_ind = best_results.index[0]
             params = study.get_trials()[best_ind].params
@@ -212,8 +212,8 @@ def get_optimize_Lasso(X_train: pd.DataFrame, y_train: pd.Series,
 
     return params, study
 
-def import_model_params(trial: optuna.Trial,
-                        param_dict: dict) -> dict:
+def extract_model_params(trial: optuna.Trial,
+                        param_dict: dict) -> Tuple[dict, dict]:
 
     model_params_optim = {}
     model_params_base = {}
@@ -272,19 +272,24 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
                         model_name="model_name",
                         data_name: str=None,
                         model_cls: BaseEstimator = None,
-                        model_params_optim: Dict[str, dict] = None,
+                        model_params: Dict[str, dict] = None,
+                        final_estim_cls: BaseEstimator = None
                         ) -> Tuple[dict, Any, optuna.study.study.Study]:
 
     if model_cls is None:
         raise ValueError("Не указан класс модели (model_cls).")
-    if model_params_optim is None:
-        raise ValueError("Не передано описание пространства гиперпараметров (model_params_optim).")
+    if model_params is None:
+        raise ValueError("Не передано описание пространства гиперпараметров (model_params).")
 
     X_all = pd.concat([X_train, X_test])
 
     def objective(trial):
 
-        optim_params, base_params = import_model_params(trial, model_params_optim)
+        optim_params, base_params = extract_model_params(trial, model_params)
+        if model_cls == StackingRegressor:
+            # optim_params = {"final_estimator" : ElasticNet(**optim_params)}
+            base_params['final_estimator'] = final_estim_cls(**optim_params)
+            optim_params = {}
         model = model_cls(**optim_params, **base_params)
 
         best_model, res_dict = model_train.train_cv(X=X_train, y=y_train,
@@ -303,8 +308,8 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
 
     study = optuna.create_study(study_name="params_study",
                                 directions=[ direction_1, direction_2],
-                                sampler=optuna.samplers.TPESampler(seed=1),
-                                pruner=optuna.pruners.HyperbandPruner()
+                                sampler=optuna.samplers.TPESampler(seed=1, multivariate=True),
+                                # pruner=optuna.pruners.HyperbandPruner()
                                 )
     study.optimize(objective, n_trials=n_trials, n_jobs=4)
 
