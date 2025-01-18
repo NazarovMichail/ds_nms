@@ -79,45 +79,37 @@ def get_best_study_params(study: optuna.study.study.Study,
     return params
 
 def optuna_plot(study: optuna.study.study.Study,
-                directory: str,
+                directory: str = None,
                 param_importances: bool=False,
                 name_metric_1: str="first_param",
                 name_metric_2: str="second_param",
                 model_name="model_name") -> None:
 
-    DATE = dt.now().strftime("%Y_%m_%d_%H_%M")
+    if directory is not None:
+        DATE = dt.now().strftime("%Y_%m_%d_%H_%M")
 
-    os.makedirs(name="optuna_plots", exist_ok=True)
+        os.makedirs(name=f"optuna_plots/{directory}", exist_ok=True)
 
-    try:
-        optuna.visualization.plot_pareto_front(study,
-                                               target_names=[f"{name_metric_1}",
-                                                             f"{name_metric_2}"]).write_html(f'optuna_plots/{directory}/{model_name}_pareto_front_{DATE}.html')
-        optuna.visualization.plot_slice(study,
-                                        target=lambda trial: trial.values[0],
-                                        target_name=f'{name_metric_1}').write_html(f'optuna_plots/{directory}/{model_name}_metric_1_slice_{DATE}.html')
-        optuna.visualization.plot_slice(study,
-                                        target=lambda trial: trial.values[1],
-                                        target_name=f'{name_metric_2}').write_html(f'optuna_plots/{directory}/{model_name}_metric_2_slice_{DATE}.html')
+        try:
+            optuna.visualization.plot_pareto_front(study,
+                                                   target_names=[f"{name_metric_1}",
+                                                                 f"{name_metric_2}"]).write_html(f'optuna_plots/{directory}/{model_name}_pareto_front_{DATE}.html')
+            optuna.visualization.plot_slice(study,
+                                            target=lambda trial: trial.values[0],
+                                            target_name=f'{name_metric_1}').write_html(f'optuna_plots/{directory}/{model_name}_metric_1_slice_{DATE}.html')
+            optuna.visualization.plot_slice(study,
+                                            target=lambda trial: trial.values[1],
+                                            target_name=f'{name_metric_2}').write_html(f'optuna_plots/{directory}/{model_name}_metric_2_slice_{DATE}.html')
 
-        if param_importances:
-            optuna.visualization.plot_param_importances(study).write_html(f'optuna_plots/{directory}/param_importances_{DATE}.html')
+            if param_importances:
+                optuna.visualization.plot_param_importances(study).write_html(f'optuna_plots/{directory}/param_importances_{DATE}.html')
 
-    except FileNotFoundError:
-        dir_path = os.path.join("optuna_plots", f"{directory}")
-        os.mkdir(dir_path)
-        print("________________________________________________________________________________________________")
-        print(f"Создана директория: {directory} для размещения графиков оптимизации гиперпараметров")
-        optuna.visualization.plot_pareto_front(study, target_names=[f"{name_metric_1}", f"{name_metric_2}"]).write_html(f'optuna_plots/{directory}/{model_name}_pareto_front_{DATE}.html')
-        optuna.visualization.plot_slice(study,
-                                        target=lambda trial: trial.values[0],
-                                        target_name=f'{name_metric_1}').write_html(f'optuna_plots/{directory}/{model_name}_metric_1_slice_{DATE}.html')
-        optuna.visualization.plot_slice(study,
-                                        target=lambda trial: trial.values[1],
-                                        target_name=f'{name_metric_2}').write_html(f'optuna_plots/{directory}/{model_name}_metric_2_slice_{DATE}.html')
-
-        if param_importances:
-            optuna.visualization.plot_param_importances(study).write_html(f'optuna_plots/{directory}/{model_name}_param_importances_{DATE}.html')
+        except Exception as e:
+            print(e)
+    else:
+        optuna.visualization.plot_pareto_front(study, target_names=[f"{name_metric_1}", f"{name_metric_2}"]).show()
+        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[0], target_name=f'{name_metric_1}').show()
+        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[1], target_name=f'{name_metric_2}').show()
 
 def get_optimize_Lasso(X_train: pd.DataFrame, y_train: pd.Series,
                         X_test: pd.DataFrame,
@@ -234,7 +226,7 @@ def extract_model_params(trial: optuna.Trial,
                 raise ValueError(f"Неизвестный тип параметра: {param_type}")
     return model_params_optim, model_params_base
 
-def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
+def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                         X_test: pd.DataFrame,
                         metric_1: Literal["R2_val_macro",
                                           "RMSE_val_macro",
@@ -247,7 +239,7 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
                                           "negative_all",
                                           "R2_diff_rel",
                                           "RMSE_diff_rel",
-                                          "MAE_diff_rel"]="R2_diff_rel",
+                                          "MAE_diff_rel"]="R2_val_micro",
                         metric_2: Literal["R2_val_macro",
                                           "RMSE_val_macro",
                                           "MAE_val_macro",
@@ -259,21 +251,20 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
                                           "negative_all",
                                           "R2_diff_rel",
                                           "RMSE_diff_rel",
-                                          "MAE_diff_rel"]="R2_val_micro",
-                        direction_1: Literal["minimize", "maximize"]="minimize",
-                        direction_2: Literal["minimize", "maximize"]="maximize",
+                                          "MAE_diff_rel"]="RMSE_diff_rel",
+                        direction_1: Literal["minimize", "maximize"]="maximize",
+                        direction_2: Literal["minimize", "maximize"]="minimize",
                         n_trials: int=100,
                         threshold=0.11,
-                        cv_type: str = 'loo',
+                        cv_type: Literal['kf', 'loo', 'stratify', 'ts']='loo',
                         metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
                         n_splits: int = 5,
                         train_size: int = 48,
                         val_size: int = 12,
-                        model_name="model_name",
                         data_name: str=None,
                         model_cls: BaseEstimator = None,
                         model_params: Dict[str, dict] = None,
-                        final_estim_cls: BaseEstimator = None
+                        final_estim_cls: BaseEstimator = None # Только для Stacking
                         ) -> Tuple[dict, Any, optuna.study.study.Study]:
 
     if model_cls is None:
@@ -287,7 +278,6 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
 
         optim_params, base_params = extract_model_params(trial, model_params)
         if model_cls == StackingRegressor:
-            # optim_params = {"final_estimator" : ElasticNet(**optim_params)}
             base_params['final_estimator'] = final_estim_cls(**optim_params)
             optim_params = {}
         model = model_cls(**optim_params, **base_params)
@@ -313,18 +303,138 @@ def get_optimize_model(X_train: pd.DataFrame, y_train: pd.Series,
                                 )
     study.optimize(objective, n_trials=n_trials, n_jobs=4)
 
-    params = get_best_study_params(study=study,
+    best_params = get_best_study_params(study=study,
                                    threshold=threshold,
                                    direction_1=direction_1,
                                    direction_2=direction_2)
 
     clear_output()
 
+
     optuna_plot(study=study,
                 directory=data_name,
                 param_importances=False,
                 name_metric_1=f"{metric_1}",
                 name_metric_2=f"{metric_2}",
-                model_name=model_name)
+                model_name=model_cls.__name__ )
 
-    return params, study
+    return best_params, study
+
+def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
+                        X_test: pd.DataFrame, y_test: pd.Series,
+                        metric_1: Literal["R2_val_macro",
+                                          "RMSE_val_macro",
+                                          "MAE_val_macro",
+                                          "RE_val_macro",
+                                          "R2_val_micro",
+                                          "RMSE_val_micro",
+                                          "MAE_val_micro",
+                                          "RE_val_micro",
+                                          "negative_all",
+                                          "R2_diff_rel",
+                                          "RMSE_diff_rel",
+                                          "MAE_diff_rel"]="R2_val_micro",
+                        metric_2: Literal["R2_val_macro",
+                                          "RMSE_val_macro",
+                                          "MAE_val_macro",
+                                          "RE_val_macro",
+                                          "R2_val_micro",
+                                          "RMSE_val_micro",
+                                          "MAE_val_micro",
+                                          "RE_val_micro",
+                                          "negative_all",
+                                          "R2_diff_rel",
+                                          "RMSE_diff_rel",
+                                          "MAE_diff_rel"]="RMSE_diff_rel",
+                        direction_1: Literal["minimize", "maximize"]="maximize",
+                        direction_2: Literal["minimize", "maximize"]="minimize",
+                        n_trials: int=100,
+                        threshold=0.11,
+                        cv_type: Literal['kf', 'loo', 'stratify', 'ts']='loo',
+                        metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
+                        n_splits: int = 5,
+                        train_size: int = 48,
+                        val_size: int = 12,
+                        data_name: str=None,
+                        model_cls: BaseEstimator = None,
+                        model_params: Dict[str, dict] = None,
+                        final_estim_cls: BaseEstimator = None # Только для Stacking
+                        ) -> Dict[str,
+                                Tuple[BaseEstimator, Any, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] ]:
+
+    X_all = pd.concat([X_train, X_test])
+    y_all = pd.concat([y_train, y_test])
+
+    #----------------------------------------------------#
+    # Подбор оптимальных параметров модели
+    #----------------------------------------------------#
+    best_params, study = get_optimize_params(X_train=X_train, y_train=y_train, X_test=X_test,
+                                     metric_1=metric_1,
+                                     metric_2=metric_2,
+                                     direction_1=direction_1,
+                                     direction_2=direction_2,
+                                     n_trials=n_trials,
+                                     threshold=threshold,
+                                     cv_type=cv_type,
+                                     metric_best=metric_best,
+                                     data_name=data_name,
+                                     model_cls=model_cls,
+                                     model_params=model_params)
+
+    #----------------------------------------------------#
+    # Обучение модели с подобранными параметрами
+    #----------------------------------------------------#
+    best_trained_model, cv_metrics = model_train.train_cv(X=X_train, y=y_train,
+                                                    model=model_cls(**best_params),
+                                                    cv_type=cv_type,
+                                                    metric_best=metric_best,
+                                                    data_name=data_name)
+
+    #----------------------------------------------------#
+    # Получение метрик
+    #----------------------------------------------------#
+    train_metrics, _ = model_train.get_prediction(X=X_train, y=y_train,
+                                                model=best_trained_model,
+                                                data_name=data_name,
+                                                metrics_type='train'
+                                                        )
+    test_metrics, _ = model_train.get_prediction(X=X_test, y=y_test,
+                                                model=best_trained_model,
+                                                data_name=data_name,
+                                                metrics_type='test'
+                                                        )
+    all_metrics, y_pred_all = model_train.get_prediction(X=X_all, y=y_all,
+                                                model=best_trained_model,
+                                                data_name=data_name,
+                                                metrics_type='all'
+                                                        )
+    #----------------------------------------------------#
+    # Добавление целевых переменных в датафрейм признаков
+    #----------------------------------------------------#
+    y_pred_all.name = 'y_pred'
+    y_all.name = 'y_true'
+
+    pred_df = pd.concat([X_all , y_all, y_pred_all], axis=1)
+
+    pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
+    pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 2) * 100
+    pred_df['test_data'] = " "
+    pred_df.loc[y_test.index, 'test_data'] = "X"
+
+    pred_df.sort_values(by='rel_error', ascending=False, inplace=True)
+
+    optimize_results = {}
+    optimize_results['model'] = best_trained_model
+    optimize_results['study'] = study
+    optimize_results['cv_metrics'] = pd.DataFrame([cv_metrics])
+    optimize_results['train_metrics'] = train_metrics
+    optimize_results['test_metrics'] = test_metrics
+    optimize_results['all_metrics'] = all_metrics
+    optimize_results['pred_df'] = pred_df
+    print(f'Ключи для получения результатов: {optimize_results.keys()}')
+    #----------------------------------------------------#
+    # Визуализация подбора параметров
+    #----------------------------------------------------#
+    optuna_plot(study=study,name_metric_1=metric_1, name_metric_2=metric_2)
+
+    return optimize_results

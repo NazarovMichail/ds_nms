@@ -28,8 +28,9 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import TimeSeriesSplit
 
 
-def get_feature_importance_df(X: pd.DataFrame, model: BaseEstimator) -> pd.DataFrame:
-    """Формирует датафрейм с важностью (весами) признаков для обученной модели.
+def get_feature_importance_df(X: pd.DataFrame,
+                              model: BaseEstimator) -> pd.DataFrame:
+    """Формирует датафрейм с важностью признаков для обученной модели.
 
     Args:
         X (pd.DataFrame): Исходный датафрейм
@@ -88,8 +89,10 @@ def get_prediction(
     X: pd.DataFrame,
     y: pd.Series,
     model: BaseEstimator,
-    re_threshold: int = 30
-) -> Tuple[pd.DataFrame, np.ndarray]:
+    re_threshold: int = 30,
+    data_name: str = 'data_name',
+    metrics_type: str = None
+) -> Tuple[pd.DataFrame, pd.Series]:
     """Возвращает датафрейм с метриками и массив предсказаний модели.
 
     Args:
@@ -97,11 +100,14 @@ def get_prediction(
         y (pd.Series): Целевая переменная
         model (BaseEstimator): Обученная модель
         re_threshold (int, optional): Пороовое значение относительной ошибки. Defaults to 30.
+        data_name (str): Название данных. Defaults to 'data_name'
+        metrics_type (str): Тип разделения данных (train / test ...) Defaults to None.
 
     Returns:
-        Tuple[pd.DataFrame, np.ndarray]: Кортеж датафрейма с метриками и массив предсказаний модели
+        Tuple[pd.DataFrame, pd.Series]: Кортеж датафрейма с метриками и массив предсказаний модели
     """
-    y_pred = model.predict(X)
+    y_pred_arr = model.predict(X)
+    y_pred = pd.Series(data=y_pred_arr, index=X.index)
 
     RMSE = root_mean_squared_error(y, y_pred)
     MAE = mean_absolute_error(y, y_pred)
@@ -111,10 +117,10 @@ def get_prediction(
     negative = (y_pred < 0).sum()
 
     metrics_dict = {
-        "RMSE": RMSE,
-        "MAE": MAE,
-        "RE": RE,
         "negative": negative,
+        "RE": RE,
+        "MAE": MAE,
+        "RMSE": RMSE
     }
 
     # Проверяем, что в выборке больше 1 точки (иначе r2_score не посчитать)
@@ -126,10 +132,16 @@ def get_prediction(
             NRMSE = np.nan
         else:
             NRMSE = RMSE / denom
-        metrics_dict["R2"] = R2
         metrics_dict["NRMSE"] = NRMSE
+        metrics_dict["R2"] = R2
 
     metrics_df = pd.DataFrame(metrics_dict, index=[0])
+
+    if metrics_type is not None:
+        for col_name in metrics_df.columns:
+            metrics_df = metrics_df.rename(columns={col_name: f'{col_name}_{metrics_type}'})
+    metrics_df['data'] = data_name
+
     return metrics_df, y_pred
 
 def train_cv(
@@ -320,32 +332,34 @@ def train_cv(
 
     if cv_type in ('ts'):
         # Для 'ts' — последняя
-        best_model = models_history[-1]
+        best_model_split = models_history[-1]
 
     if cv_type == "loo":
         # Логика выбора "лучшей": к примеру, минимизируем MAE_val
         if metric_best in ('RMSE_val', 'MAE_val', 'RE_val' ):
             if metric_best in ('RMSE_val', 'MAE_val'):
                 best_score_ind = results_dict[metric_best].argmin()
-                best_model = models_history[best_score_ind]
+                best_model_split = models_history[best_score_ind]
             else:
                 best_score_ind = results_dict[metric_best].argmax()
-                best_model = models_history[best_score_ind]
+                best_model_split = models_history[best_score_ind]
         else:
             raise ValueError("""Для LOO метрика выбора лучшей модели (metric_best)
                 должна быть: RMSE_val, MAE_val, RE_val""")
     else:
         if metric_best in ('RMSE_val', 'MAE_val'):
             best_score_ind = results_dict[metric_best].argmin()
-            best_model = models_history[best_score_ind]
+            best_model_split = models_history[best_score_ind]
         else:
             best_score_ind = results_dict[metric_best].argmax()
-            best_model = models_history[best_score_ind]
+            best_model_split = models_history[best_score_ind]
+
+    best_model = best_model_split.fit(X, y)
     # -------------------------- #
     # 4. Сводный словарь с результатами
     # -------------------------- #
     final_result = {
-        'model': str(model),
+        'model': str(best_model),
         'data_name': data_name
     }
 
@@ -355,7 +369,7 @@ def train_cv(
         final_result[f'{key}_splits'] = np.round(values, 3)
 
     y_val_concat = pd.concat(y_val_full).values
-    y_pred_concat = np.concatenate(y_pred_full)
+    y_pred_concat = pd.concat(y_pred_full).values
     if len(y_val_concat) > 1:
         final_result['R2_val_micro'] = r2_score(y_val_concat, y_pred_concat)
         final_result['RMSE_val_micro'] = root_mean_squared_error(
@@ -385,7 +399,7 @@ def train_cv(
     if cv_type == 'loo':
         R2_diff = abs(final_result['R2_train_macro'] - final_result['R2_val_micro'])
         RMSE_diff = abs(final_result['RMSE_train_macro'] - final_result['RMSE_val_micro'])
-        MAE_diff = abs(final_result['MAE_train_macro'] - final_result['MAE_val_micro'])
+        MAE_diff = abs(final_result['MAE_train_macro'] - final_result['MAE_val_macro'])
     else:
         R2_diff = (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean()
         RMSE_diff = abs(final_result['RMSE_train_splits'] - final_result['RMSE_val_splits']).mean()
