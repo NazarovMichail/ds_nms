@@ -117,6 +117,7 @@ def get_prediction(
     negative = (y_pred < 0).sum()
 
     metrics_dict = {
+        "model": model,
         "negative": negative,
         "RE": RE,
         "MAE": MAE,
@@ -359,7 +360,7 @@ def train_cv(
     # 4. Сводный словарь с результатами
     # -------------------------- #
     final_result = {
-        'model': str(best_model),
+        'model': str(model),
         'data_name': data_name
     }
 

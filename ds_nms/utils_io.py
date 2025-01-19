@@ -105,6 +105,7 @@ def load_data(
         except Exception as error:
             print(f"Ошибка при загрузке файла {file_path}: {error}")
 
+    print([data.shape for data in loaded_lst])
     return loaded_lst
 
 def save_split_description(df_initial: pd.DataFrame,

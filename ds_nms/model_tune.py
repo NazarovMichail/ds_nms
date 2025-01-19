@@ -352,6 +352,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                         threshold=0.11,
                         cv_type: Literal['kf', 'loo', 'stratify', 'ts']='loo',
                         metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
+                        show_plots: bool = True,
                         n_splits: int = 5,
                         train_size: int = 48,
                         val_size: int = 12,
@@ -431,10 +432,97 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     optimize_results['test_metrics'] = test_metrics
     optimize_results['all_metrics'] = all_metrics
     optimize_results['pred_df'] = pred_df
-    print(f'Ключи для получения результатов: {optimize_results.keys()}')
+
     #----------------------------------------------------#
     # Визуализация подбора параметров
     #----------------------------------------------------#
-    optuna_plot(study=study,name_metric_1=metric_1, name_metric_2=metric_2)
+    if show_plots:
+        optuna_plot(study=study,name_metric_1=metric_1, name_metric_2=metric_2)
+        print(f'Ключи для получения результатов: {list(optimize_results.keys())}')
 
     return optimize_results
+
+def get_optimize_several_results(data_dict: Dict[str, List[pd.DataFrame]],
+                                models_dict: Dict[BaseEstimator, dict],
+                                metric_1: Literal["R2_val_macro",
+                                                  "RMSE_val_macro",
+                                                  "MAE_val_macro",
+                                                  "RE_val_macro",
+                                                  "R2_val_micro",
+                                                  "RMSE_val_micro",
+                                                  "MAE_val_micro",
+                                                  "RE_val_micro",
+                                                  "negative_all",
+                                                  "R2_diff_rel",
+                                                  "RMSE_diff_rel",
+                                                  "MAE_diff_rel"]="R2_val_micro",
+                                metric_2: Literal["R2_val_macro",
+                                                  "RMSE_val_macro",
+                                                  "MAE_val_macro",
+                                                  "RE_val_macro",
+                                                  "R2_val_micro",
+                                                  "RMSE_val_micro",
+                                                  "MAE_val_micro",
+                                                  "RE_val_micro",
+                                                  "negative_all",
+                                                  "R2_diff_rel",
+                                                  "RMSE_diff_rel",
+                                                  "MAE_diff_rel"]="RMSE_diff_rel",
+                                direction_1: Literal["minimize", "maximize"]="maximize",
+                                direction_2: Literal["minimize", "maximize"]="minimize",
+                                n_trials: int=100,
+                                threshold=0.11,
+                                cv_type: Literal['kf', 'loo', 'stratify', 'ts']='loo',
+                                metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
+                                n_splits: int = 5,
+                                train_size: int = 48,
+                                val_size: int = 12,
+                                show_plots: bool = True
+                                ) -> Dict[str, dict]:
+
+    final_result_dict = {}
+    prog_bar_data = tqdm(data_dict.items(), total=len(data_dict.keys()))
+    for data_name, data_list in prog_bar_data:
+        train_metrics_lst = []
+        val_metrics_lst = []
+        test_metrics_lst = []
+        studies_lst = []
+        for model_cls, params in models_dict.items():
+            optim_result_dict = get_optimize_results(X_train=data_list[0], y_train=data_list[1],
+                                                                X_test=data_list[2], y_test=data_list[3],
+                                                                metric_1=metric_1,
+                                                                metric_2=metric_2,
+                                                                direction_1=direction_1,
+                                                                direction_2=direction_2,
+                                                                n_trials=n_trials,
+                                                                threshold=threshold,
+                                                                cv_type=cv_type,
+                                                                metric_best=metric_best,
+                                                                show_plots=False,
+                                                                n_splits=n_splits,
+                                                                train_size=train_size,
+                                                                val_size=val_size,
+                                                                data_name=data_name,
+                                                                model_cls=model_cls,
+                                                                model_params=params
+                                                                )
+            train_metrics_lst.append(optim_result_dict['train_metrics'])
+            val_metrics_lst.append(optim_result_dict['cv_metrics'])
+            test_metrics_lst.append(optim_result_dict['test_metrics'])
+            studies_lst.append(optim_result_dict['study'])
+
+        final_result_dict[data_name] = {"train_metrics": pd.concat(train_metrics_lst),
+                                         "val_metrics": pd.concat(val_metrics_lst),
+                                         "test_metrics": pd.concat(test_metrics_lst),
+                                         "study": studies_lst}
+    if show_plots:
+        for data, res_dict in final_result_dict.items():
+            for i, model_name in enumerate(models_dict.keys()):
+                cur_study = res_dict['study'][i]
+                print(f"Данные: {data} | Модель: {model_name.__name__}")
+                optuna_plot(study=cur_study, name_metric_1=metric_1, name_metric_2=metric_2)
+
+    print(f'Данные для обучения моделей: {list(final_result_dict.keys())}')
+    print(f'Собраны метрики: {list(final_result_dict[data_name].keys())}')
+
+    return final_result_dict
