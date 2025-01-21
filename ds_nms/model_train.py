@@ -360,7 +360,7 @@ def train_cv(
     # 4. Сводный словарь с результатами
     # -------------------------- #
     final_result = {
-        'model': str(model),
+        'model': str(best_model),
         'data_name': data_name
     }
 

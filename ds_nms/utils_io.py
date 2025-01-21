@@ -3,6 +3,8 @@ from typing import List, Tuple, Any, Dict, Literal, Union
 import pickle
 import json
 import os
+import subprocess
+from dotenv import load_dotenv
 from sklearn.ensemble import IsolationForest
 import numpy as np
 from sklearn.feature_selection import RFE, SequentialFeatureSelector
@@ -27,6 +29,9 @@ from permetrics.regression import RegressionMetric
 import shap
 from sklearn.decomposition import PCA
 from sklearn.model_selection import TimeSeriesSplit
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import text
 
 
 def save_data(
@@ -138,3 +143,56 @@ def save_split_description(df_initial: pd.DataFrame,
     df_description.to_pickle(file_path)
 
     print(f"Файл {file_path} сохранен!")
+
+
+def mlflow_server_start():
+    """Запуск сервера MLFlow
+    """
+    load_dotenv()
+    USER_ML = os.getenv("USER_ML")
+    PASS_ML = os.getenv("PASS_ML")
+    BD_ML = os.getenv("BD_ML")
+
+    cmd = [
+        "mlflow",
+        "server",
+        "--backend-store-uri",
+        f"postgresql://{USER_ML}:{PASS_ML}@localhost:5432/{BD_ML}",
+        "--default-artifact-root",
+        "mlruns/",
+        "--serve-artifacts"
+    ]
+
+    try:
+        subprocess.Popen(cmd)
+        print("Сервер MLFlow запущен...")
+    except Exception as e:
+        print(e)
+
+def mlflow_run_delete() -> None:
+
+    """ Удаляет  логи MLFlow из БД postgres"""
+    load_dotenv()
+    USER_ML = os.getenv("USER_ML")
+    PASS_ML = os.getenv("PASS_ML")
+    BD_ML = os.getenv("BD_ML")
+    engine = create_engine(f"postgresql://{USER_ML}:{PASS_ML}@localhost:5432/{BD_ML}")
+
+    queries = """
+        DELETE FROM experiment_tags WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted');
+        DELETE FROM latest_metrics WHERE run_uuid=ANY(SELECT run_uuid FROM runs WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted'));
+        DELETE FROM metrics WHERE run_uuid=ANY(SELECT run_uuid FROM runs WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted'));
+        DELETE FROM tags WHERE run_uuid=ANY(SELECT run_uuid FROM runs WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted'));
+        DELETE FROM params WHERE run_uuid=ANY(SELECT run_uuid FROM runs WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted'));
+        DELETE FROM runs WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted');
+        DELETE FROM experiments where lifecycle_stage='deleted';
+    """
+
+    connection = engine.connect()
+
+    transaction = connection.begin()
+    result = connection.execute(text(queries))
+    transaction.commit()
+
+    connection.close()
+    print("Логи MLFlow из БД postgres удалены!")

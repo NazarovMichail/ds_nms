@@ -526,3 +526,46 @@ def get_optimize_several_results(data_dict: Dict[str, List[pd.DataFrame]],
     print(f'Собраны метрики: {list(final_result_dict[data_name].keys())}')
 
     return final_result_dict
+
+def mlflow_load_results(X: pd.DataFrame, y: pd.Series,
+                        optim_results: Dict[str, dict],
+                        data_name: str) -> None:
+    """Логирование метрик и обученных моделей
+
+    Args:
+        X (pd.DataFrame): Обучающий датафрейм для примера
+        y (pd.Series): Целевые переменные для примера
+        optim_results (Dict[str, dict]): Словарь с результатами обучени моделей
+        data_name (str): Название данных (название эксперимента)
+    """
+    try:
+        experiment_id = mlflow.create_experiment(name=data_name,
+                                            artifact_location=f"mlruns/{data_name}/"
+                                            )
+        mlflow.set_experiment(experiment_id=experiment_id)
+    except Exception:
+        mlflow.set_experiment(experiment_name=data_name)
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    with mlflow.start_run(run_name=f"{data_name}_run") as run:
+        for model_name, result_dict in optim_results.items():
+            with mlflow.start_run(run_name=f"{model_name}_{data_name}", nested=True) as child_run:
+                #----------------------------------------------------#
+                # Логирование метрик
+                #----------------------------------------------------#
+                mlflow.log_metric("1. R2_train", result_dict['train_metrics']['R2_train'].values.round(3).item())
+                mlflow.log_metric("2. R2_val", result_dict['cv_metrics']['R2_val_micro'].values.round(3).item())
+                mlflow.log_metric("3. R2_test", result_dict['test_metrics']['R2_test'].values.round(3).item())
+                mlflow.log_metric("4. NRMSE_train", result_dict['train_metrics']['NRMSE_train'].values.round(3).item())
+                mlflow.log_metric("5. NRMSE_val", result_dict['cv_metrics']['NRMSE_val_micro'].values.round(3).item())
+                mlflow.log_metric("6. NRMSE_test", result_dict['test_metrics']['NRMSE_test'].values.round(3).item())
+                mlflow.log_metric("7. MAE_train", result_dict['train_metrics']['MAE_train'].values.round(3).item())
+                mlflow.log_metric("8. MAE_val", result_dict['cv_metrics']['MAE_val_micro'].values.round(3).item())
+                mlflow.log_metric("9. MAE_test", result_dict['test_metrics']['MAE_test'].values.round(3).item())
+                mlflow.log_metric("10. Negatives", result_dict['all_metrics']['negative_all'].values.item())
+                mlflow.log_metric("11. RE", result_dict['all_metrics']['RE_all'].values.round(2).item())
+                #----------------------------------------------------#
+                # Логирование модели
+                #----------------------------------------------------#
+                mlflow.sklearn.log_model(result_dict['model'],
+                                         f"{model_name}_{data_name}",
+                                         input_example=X)
