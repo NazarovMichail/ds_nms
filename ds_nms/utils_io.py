@@ -32,11 +32,12 @@ from sklearn.model_selection import TimeSeriesSplit
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
+import json
 
 
 def save_data(
         file_dict: Dict[str, Any],
-        sub_dir: str,
+        sub_dir: str = '',
         directory: str = 'data/',
         format: str = 'pkl') -> None:
     """
@@ -60,8 +61,8 @@ def save_data(
             if format == 'pkl':
                 with open(file_path, 'wb') as file:
                     pickle.dump(data, file)
+
             elif format == 'json':
-                import json
                 with open(file_path, 'w', encoding='utf-8') as file:
                     json.dump(data, file, ensure_ascii=False, indent=4)
             else:
@@ -71,27 +72,27 @@ def save_data(
             print(f"Ошибка при сохранении файла {file_name}: {error}")
 
 def load_data(
-        file_lst: List[str],
-        sub_dir: str,
+        # file_lst: List[str],
         directory: str = 'data/',
+        sub_dir: str = '',
         load_format: str = 'pkl') -> List[Any]:
     """
-    Загружает данные из указанных файлов.
+    Загружает данные из указанной директории.
 
     Args:
-        file_lst (List[str]): Список имён файлов (без расширения).
-        sub_dir (str): Поддиректория, где находятся файлы.
         directory (str, optional): Основная директория. Defaults to 'data/'.
+        sub_dir (str): Поддиректория, где находятся файлы.
         format (str, optional): Формат файлов ('pkl' или 'json'). Defaults to 'pkl'.
 
     Returns:
         List[Any]: Список загруженных данных.
     """
-    loaded_lst = []
+    loaded_dict = {}
     final_dir = os.path.join(directory, sub_dir)
+    file_lst = os.listdir(final_dir)
 
     for file_name in file_lst:
-        file_path = os.path.join(final_dir, f"{file_name}.{load_format}")
+        file_path = os.path.join(directory, f'{sub_dir}/{file_name}')
         try:
             if load_format == 'pkl':
                 with open(file_path, 'rb') as file:
@@ -102,23 +103,23 @@ def load_data(
             else:
                 raise ValueError(f"Неподдерживаемый формат: {load_format}")
 
-            loaded_lst.append(loaded_file)
+            file_name_cut = file_name.replace(f'.{load_format}', '')
+            loaded_dict[file_name_cut] = loaded_file
             print(f"Файл {file_path} успешно загружен.")
 
-        except FileNotFoundError:
-            print(f"Файл {file_path} не найден.")
+        except FileNotFoundError as e:
+            print(f"Файл {file_path} не найден.| {e}")
         except Exception as error:
             print(f"Ошибка при загрузке файла {file_path}: {error}")
 
-    print([data.shape for data in loaded_lst])
-    return loaded_lst
+    return loaded_dict
 
 def save_split_description(df_initial: pd.DataFrame,
-                    initial_columns: List[str],
-                    target: pd.Series,
-                    df_name: str,
-                    directory: str='data',
-                    ) -> None:
+                            initial_columns: List[str],
+                            target: pd.Series,
+                            df_name: str,
+                            directory: str='data',
+                            ) -> None:
     """Сохраняет датафрейм с выбранными индексами целевой переменной и выбранными столбцами
 
     Args:

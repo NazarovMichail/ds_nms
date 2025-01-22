@@ -26,7 +26,7 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error,
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import mlflow
 from mlflow.models import infer_signature
-from ds_nms import model_train
+from ds_nms import model_train, utils_io
 
 
 def get_best_study_params(study: optuna.study.study.Study,
@@ -107,102 +107,15 @@ def optuna_plot(study: optuna.study.study.Study,
         except Exception as e:
             print(e)
     else:
-        optuna.visualization.plot_pareto_front(study, target_names=[f"{name_metric_1}", f"{name_metric_2}"]).show()
-        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[0], target_name=f'{name_metric_1}').show()
-        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[1], target_name=f'{name_metric_2}').show()
+        optuna.visualization.plot_pareto_front(study, target_names=[f"{name_metric_1}",
+                                                                    f"{name_metric_2}"]).show()
+        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[0],
+                                        target_name=f'{name_metric_1}').show()
+        optuna.visualization.plot_slice(study,  target=lambda trial: trial.values[1],
+                                        target_name=f'{name_metric_2}').show()
 
-def get_optimize_Lasso(X_train: pd.DataFrame, y_train: pd.Series,
-                        X_test: pd.DataFrame,
-                        metric_1: Literal["R2_val_macro",
-                                          "RMSE_val_macro",
-                                          "MAE_val_macro",
-                                          "RE_val_macro",
-                                          "R2_val_micro",
-                                          "RMSE_val_micro",
-                                          "MAE_val_micro",
-                                          "RE_val_micro",
-                                          "negative_all",
-                                          "R2_diff_rel",
-                                          "RMSE_diff_rel",
-                                          "MAE_diff_rel"]="R2_diff_rel",
-                        metric_2: Literal["R2_val_macro",
-                                          "RMSE_val_macro",
-                                          "MAE_val_macro",
-                                          "RE_val_macro",
-                                          "R2_val_micro",
-                                          "RMSE_val_micro",
-                                          "MAE_val_micro",
-                                          "RE_val_micro",
-                                          "negative_all",
-                                          "R2_diff_rel",
-                                          "RMSE_diff_rel",
-                                          "MAE_diff_rel"]="R2_val_micro",
-                        direction_1: Literal["minimize", "maximize"]="minimize",
-                        direction_2: Literal["minimize", "maximize"]="maximize",
-                        n_trials: int=100,
-                        threshold=0.11,
-                        cv_type: str = 'loo',
-                        metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
-                        n_splits: int = 5,
-                        train_size: int = 48,
-                        val_size: int = 12,
-                        alpha_range: Tuple[float]=(0, 1000),
-                        max_iter_range: int=150000,
-                        model_name="model_name",
-                        data_name: str=None
-                        ) -> Tuple[dict, Any, optuna.study.study.Study]:
-
-
-    X_all = pd.concat([X_train, X_test])
-
-    def objective(trial):
-
-        alpha = trial.suggest_float("alpha", *alpha_range, log=False)
-        max_iter =trial.suggest_categorical("max_iter", [max_iter_range])
-
-        model = Lasso(
-                    alpha=alpha,
-                    max_iter=max_iter,
-                    positive=False,
-                    random_state=1
-                    )
-
-        model, res_dict = model_train.train_cv(X=X_train, y=y_train,
-                                               model=model,
-                                               cv_type=cv_type,
-                                               metric_best=metric_best,
-                                               n_splits=n_splits,
-                                               train_size=train_size,
-                                               val_size=val_size)
-
-        y_pred = model.predict(X_all)
-        negative_all = (y_pred < 0).sum()
-        res_dict["negative_all"] = negative_all
-
-        return res_dict[metric_1], res_dict[metric_2]
-
-    study = optuna.create_study(study_name="params_study",
-                                directions=[ direction_1, direction_2],
-                                sampler=optuna.samplers.TPESampler(seed=1),
-                                pruner=optuna.pruners.HyperbandPruner()
-                                )
-    study.optimize(objective, n_trials=n_trials, n_jobs=4)
-
-    params = get_best_study_params(study=study,
-                                   threshold=threshold,
-                                   direction_1=direction_1,
-                                   direction_2=direction_2)
-
-    clear_output()
-
-    optuna_plot(study=study,
-                directory=data_name,
-                param_importances=False,
-                name_metric_1=f"{metric_1}",
-                name_metric_2=f"{metric_2}",
-                model_name=model_name)
-
-    return params, study
+        if param_importances:
+            optuna.visualization.plot_param_importances(study).show()
 
 def extract_model_params(trial: optuna.Trial,
                         param_dict: dict) -> Tuple[dict, dict]:
@@ -370,17 +283,20 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     # Подбор оптимальных параметров модели
     #----------------------------------------------------#
     best_params, study = get_optimize_params(X_train=X_train, y_train=y_train, X_test=X_test,
-                                     metric_1=metric_1,
-                                     metric_2=metric_2,
-                                     direction_1=direction_1,
-                                     direction_2=direction_2,
-                                     n_trials=n_trials,
-                                     threshold=threshold,
-                                     cv_type=cv_type,
-                                     metric_best=metric_best,
-                                     data_name=data_name,
-                                     model_cls=model_cls,
-                                     model_params=model_params)
+                                            metric_1=metric_1,
+                                            metric_2=metric_2,
+                                            direction_1=direction_1,
+                                            direction_2=direction_2,
+                                            n_trials=n_trials,
+                                            threshold=threshold,
+                                            cv_type=cv_type,
+                                            n_splits=n_splits,
+                                            train_size=train_size,
+                                            val_size=val_size,
+                                            metric_best=metric_best,
+                                            data_name=data_name,
+                                            model_cls=model_cls,
+                                            model_params=model_params)
 
     #----------------------------------------------------#
     # Обучение модели с подобранными параметрами
@@ -388,6 +304,9 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     best_trained_model, cv_metrics = model_train.train_cv(X=X_train, y=y_train,
                                                     model=model_cls(**best_params),
                                                     cv_type=cv_type,
+                                                    n_splits=n_splits,
+                                                    train_size=train_size,
+                                                    val_size=val_size,
                                                     metric_best=metric_best,
                                                     data_name=data_name)
 
@@ -418,7 +337,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     pred_df = pd.concat([X_all , y_all, y_pred_all], axis=1)
 
     pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
-    pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 2) * 100
+    pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 3) * 100
     pred_df['test_data'] = " "
     pred_df.loc[y_test.index, 'test_data'] = "X"
 
@@ -527,7 +446,7 @@ def get_optimize_several_results(data_dict: Dict[str, List[pd.DataFrame]],
 
     return final_result_dict
 
-def mlflow_load_results(X: pd.DataFrame, y: pd.Series,
+def mlflow_save_results(X: pd.DataFrame, y: pd.Series,
                         optim_results: Dict[str, dict],
                         data_name: str) -> None:
     """Логирование метрик и обученных моделей
@@ -538,6 +457,13 @@ def mlflow_load_results(X: pd.DataFrame, y: pd.Series,
         optim_results (Dict[str, dict]): Словарь с результатами обучени моделей
         data_name (str): Название данных (название эксперимента)
     """
+
+    #----------------------------------------------------#
+    # Очистка логов mlflow, запуск сервара mlflow
+    #----------------------------------------------------#
+    utils_io.mlflow_run_delete()
+    utils_io.mlflow_server_start()
+
     try:
         experiment_id = mlflow.create_experiment(name=data_name,
                                             artifact_location=f"mlruns/{data_name}/"
@@ -549,6 +475,7 @@ def mlflow_load_results(X: pd.DataFrame, y: pd.Series,
     with mlflow.start_run(run_name=f"{data_name}_run") as run:
         for model_name, result_dict in optim_results.items():
             with mlflow.start_run(run_name=f"{model_name}_{data_name}", nested=True) as child_run:
+
                 #----------------------------------------------------#
                 # Логирование метрик
                 #----------------------------------------------------#
@@ -561,11 +488,35 @@ def mlflow_load_results(X: pd.DataFrame, y: pd.Series,
                 mlflow.log_metric("7. MAE_train", result_dict['train_metrics']['MAE_train'].values.round(3).item())
                 mlflow.log_metric("8. MAE_val", result_dict['cv_metrics']['MAE_val_micro'].values.round(3).item())
                 mlflow.log_metric("9. MAE_test", result_dict['test_metrics']['MAE_test'].values.round(3).item())
-                mlflow.log_metric("10. Negatives", result_dict['all_metrics']['negative_all'].values.item())
-                mlflow.log_metric("11. RE", result_dict['all_metrics']['RE_all'].values.round(2).item())
+                mlflow.log_metric("Negatives", result_dict['all_metrics']['negative_all'].values.item())
+                mlflow.log_metric("RE", result_dict['all_metrics']['RE_all'].values.round(2).item())
                 #----------------------------------------------------#
                 # Логирование модели
                 #----------------------------------------------------#
                 mlflow.sklearn.log_model(result_dict['model'],
                                          f"{model_name}_{data_name}",
                                          input_example=X)
+
+def get_prediction_df(init_df: pd.DataFrame,
+                      pred_df: pd.DataFrame,
+                      init_cols: List[str],
+                      pred_cols: List[str] = ['y_true', 'y_pred', 'abs_error', 'rel_error', 'test_data'],
+                      sort_by: str = 'rel_error') -> pd.DataFrame:
+
+    """Создание датафрейма с предсказаниями и описательными столбцами
+
+    Args:
+        init_df (pd.DataFrame): Исходный датафрейм
+        pred_df (pd.DataFrame): Датафрейм с предсказаниями
+        init_cols (List[str]): Имена столбцов исходного датафрейма для объединения
+        pred_cols (List[str], optional): Имена столбцов датафрейма с предсказаниями для объединения. Defaults to ['y_true', 'y_pred', 'abs_error', 'rel_error', 'test_data'].
+        sort_by (str, optional): Столбец по которому отсортировать датафрейм. Defaults to 'rel_error'.
+
+    Returns:
+        pd.DataFrame: Датафрейм с предсказаниями и описательными столбцами
+    """
+    init_df = init_df[init_cols]
+    result_df = pd.concat([init_df, pred_df.loc[:, pred_cols]], axis=1)
+    result_df.sort_values(by=sort_by, ascending=False, inplace=True)
+
+    return result_df

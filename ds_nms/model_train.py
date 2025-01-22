@@ -61,6 +61,67 @@ def get_feature_importance_df(X: pd.DataFrame,
             .sort_values(by='importances', ascending=False)
             .reset_index(drop=True)
         )
+    feature_importances_df['importances_rel'] = round(feature_importances_df['importances'] / abs(feature_importances_df['importances']).sum(), 2)
+
+    return feature_importances_df
+
+def get_importances_barplot(X: pd.DataFrame,
+                            model: BaseEstimator,
+                            model_name: str="model",
+                            figsize: Tuple[int] = (20,10),
+                            save_dir: str = 'feat_imp',
+                            show_shap: bool = True
+                            ) -> pd.DataFrame:
+
+    plt.style.use('ggplot')
+
+    #---------------------------------------------------------------------------#
+    # Важность признаков для моделей с аттрибутами .coef_ / .feature_importances_
+    #---------------------------------------------------------------------------#
+    try:
+        feature_importances_df = get_feature_importance_df(X=X, model=model)
+
+
+        figure, ax = plt.subplots(1,1, figsize=figsize)
+        ax = sns.barplot(data=feature_importances_df,
+                        y='features',
+                        x='importances_rel',
+                        ax=ax, orient='h',
+                        color='r',
+                        edgecolor='black',
+                        width=0.3)
+
+        for p in ax.patches:
+            ax.annotate(format(p.get_width(), '.2f'),  # Значение на конце столбца
+                    (p.get_width(), p.get_y() + p.get_height() / 2),  # Позиция текста
+                    ha='left', va='center',
+                    xytext=(2, 0),  # Смещение текста вправо
+                    textcoords='offset points')
+
+        ax.set_title(f'Feature importances. {model_name}')
+
+        os.makedirs(name=save_dir, exist_ok=True)
+        plt.savefig(f"{save_dir}/FE_bar_{model_name}.png", dpi=300)
+        plt.show()
+    except Exception as e:
+        print(e)
+
+    #------------------------------#
+    # Важность признаков SHAP
+    #------------------------------#
+    explainer = shap.Explainer(model.predict, X)
+    shap_values = explainer(X)
+    shap.summary_plot(shap_values, show=False)
+    plt.savefig(f"{save_dir}/SHAP_summary_{model_name}.jpg", bbox_inches='tight')
+    plt.close()
+
+    shap.plots.bar(shap_values, show=False, max_display=None)
+    plt.savefig(f"{save_dir}/SHAP_bar_{model_name}.jpg", bbox_inches='tight')
+    plt.close()
+
+    if show_shap:
+        shap.summary_plot(shap_values, show=True)
+        shap.plots.bar(shap_values, show=True)
 
     return feature_importances_df
 
