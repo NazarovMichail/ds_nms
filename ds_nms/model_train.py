@@ -26,6 +26,7 @@ from permetrics.regression import RegressionMetric
 import shap
 from sklearn.decomposition import PCA
 from sklearn.model_selection import TimeSeriesSplit
+import dtreeviz
 
 
 def get_feature_importance_df(X: pd.DataFrame,
@@ -69,8 +70,9 @@ def get_importances_barplot(X: pd.DataFrame,
                             model: BaseEstimator,
                             model_name: str="model",
                             figsize: Tuple[int] = (20,10),
-                            save_dir: str = 'feat_imp',
-                            show_shap: bool = True
+                            save_dir: str = None,
+                            show_shap: bool = True,
+                            y: pd.Series = None #Только для визуализации дерева
                             ) -> pd.DataFrame:
 
     plt.style.use('ggplot')
@@ -100,8 +102,9 @@ def get_importances_barplot(X: pd.DataFrame,
 
         ax.set_title(f'Feature importances. {model_name}')
 
-        os.makedirs(name=save_dir, exist_ok=True)
-        plt.savefig(f"{save_dir}/FE_bar_{model_name}.png", dpi=300)
+        if save_dir is not None:
+            os.makedirs(name=save_dir, exist_ok=True)
+            plt.savefig(f"{save_dir}/FE_bar_{model_name}.png", dpi=300)
         plt.show()
     except Exception as e:
         print(e)
@@ -111,16 +114,33 @@ def get_importances_barplot(X: pd.DataFrame,
     #------------------------------#
     explainer = shap.Explainer(model.predict, X)
     shap_values = explainer(X)
-    shap.summary_plot(shap_values, show=False)
-    plt.savefig(f"{save_dir}/SHAP_summary_{model_name}.jpg", bbox_inches='tight')
-    plt.close()
 
-    shap.plots.bar(shap_values, show=False, max_display=None)
-    plt.savefig(f"{save_dir}/SHAP_bar_{model_name}.jpg", bbox_inches='tight')
-    plt.close()
 
+    if save_dir is not None:
+        shap.summary_plot(shap_values, show=False)
+        plt.savefig(f"{save_dir}/SHAP_summary_{model_name}.jpg", bbox_inches='tight')
+        plt.close()
+
+        shap.plots.bar(shap_values, show=False, max_display=None)
+        plt.savefig(f"{save_dir}/SHAP_bar_{model_name}.jpg", bbox_inches='tight')
+        plt.close()
+
+        #------------------------------#
+        # Визуализация дерева решений
+        #------------------------------#
+        if y is not None:
+            try:
+                dtreeviz.model(model=model,
+                       X_train=X,
+                       y_train=y,
+                       feature_names=X.columns,
+                       target_name='y'
+                       ).view(scale=3, fontname=None, ticks_fontsize=5, label_fontsize=5).save(f'{save_dir}/DT_viz.svg')
+            except Exception:
+                ...
     if show_shap:
         shap.summary_plot(shap_values, show=True)
+        plt.close()
         shap.plots.bar(shap_values, show=True)
 
     return feature_importances_df

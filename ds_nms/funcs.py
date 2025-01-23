@@ -81,50 +81,6 @@ def df_encoding(
 
 
 
-def get_feature_explain(X_train: pd.DataFrame,
-                        trained_model: BaseEstimator,
-                        waterfall_dict: Dict[int, str] = None,
-                        img_path: str = "Model"
-                        ) -> None:
-
-    try:
-        os.makedirs(f'data/FE_plots/{img_path}', exist_ok=False)
-    except FileExistsError:
-        print("Dir exists |")
-        print("_"*11)
-
-    explainer = shap.Explainer(trained_model.predict, X_train)
-    shap_values = explainer(X_train)
-    shap.summary_plot(shap_values, show=False)
-    plt.savefig(f"data/FE_plots/{img_path}/FE_{img_path}.jpg", bbox_inches='tight')
-    plt.close()
-    shap.plots.bar(shap_values, show=False, max_display=None)
-    plt.savefig(f"data/FE_plots/{img_path}/FE_bar_{img_path}.jpg", bbox_inches='tight')
-    plt.close()
-
-    if waterfall_dict is not None:
-        df_inx_reset = X_train.copy()
-        df_inx_reset = X_train.reset_index()
-
-        for df_inx, name in waterfall_dict.items():
-            print(name)
-            shap_inx = df_inx_reset[df_inx_reset['index'] == df_inx].index[0]
-            shap.waterfall_plot(shap_values[shap_inx], show=False)
-            plt.title(name)
-            plt.savefig(f"data/FE_plots/{img_path}/{name}.png", bbox_inches='tight')
-            plt.close()
-
-def concat_metrics(result_df: pd.DataFrame, inx: int, data_names: List[str], ) -> pd.DataFrame:
-
-    df_concat = pd.concat([result_df[data_names[0]][inx]])
-    for data_name in data_names[1:]:
-        df_concat = pd.concat((df_concat, result_df[data_name][inx]))
-
-    df_concat['data_name'] = data_names
-    return df_concat
-
-
-
 
 def get_transform_feature(X_train: pd.DataFrame, X_test: pd.DataFrame,
                         column: str, func: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
