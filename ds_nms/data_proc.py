@@ -68,7 +68,7 @@ def features_separate(df: pd.DataFrame, threshold: int) -> Tuple[List[str], List
 def get_stratified_df(X: pd.DataFrame, feature: pd.Series,
                         col_name: str="strat",
                         display_info: bool=True) -> pd.DataFrame:
-    """_summary_
+    """Добавление в исходный датафрейм квартилей указанной переменной
 
     Args:
         X (pd.DataFrame): Исходный датафрейм.
@@ -77,7 +77,7 @@ def get_stratified_df(X: pd.DataFrame, feature: pd.Series,
         display_info (bool, optional): Отображать информацию о стратификации. Defaults to True.
 
     Returns:
-        pd.DataFrame: Датафрейм с добавленным столбцом стратификации.
+        pd.DataFrame: Датафрейм с добавленным столбцом стратификации по квартилям.
     """
     q1 = feature.quantile(0.25)
     q2 = feature.quantile(0.50)
@@ -345,3 +345,54 @@ def get_polyfeatures(X_train: pd.DataFrame,
     X_test_poly = pd.DataFrame(X_test_poly_arr, columns=df_columns, index=X_test.index)
 
     return X_train_poly, X_test_poly
+
+def df_target_encoding(
+            df_train: pd.DataFrame,
+            df_test: pd.DataFrame,
+            y_train: pd.Series,
+            encode_columns: List[str],
+            target_type: Literal["continuous", "binary", "multiclass"] = "continuous",
+            show_info: bool = True
+            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Целевое кодирование категориальных столбцов датафрейма
+
+    Args:
+        df_train (pd.DataFrame): Обучающий датафрейм
+        df_test (pd.DataFrame): Тестовый датафрейм
+        y_train (pd.Series): Обучающая челевая переменная
+        encode_columns (List[str]): Имена стобцов для кодирования
+        target_type (Literal[&quot;continuous&quot;, &quot;binary&quot;, &quot;multiclass&quot;], optional): Тип целевой переменной. Defaults to "continuous".
+        show_info (bool, optional): Показывать статистики результата. Defaults to True.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: Обучающий и тестовый датафрейм с закодированными столбцами
+    """
+    train_inx = df_train.index
+    test_inx = df_test.index
+
+    df_train_cat = df_train[encode_columns]
+    df_test_cat = df_test[encode_columns]
+
+    encoder = TargetEncoder(target_type=target_type)
+
+    train_encoded_arr = encoder.fit_transform(df_train_cat, y_train)
+    test_encoded_arr = encoder.transform(df_test_cat)
+
+    df_train_encoded = pd.DataFrame(
+        data=train_encoded_arr,
+        columns=encode_columns,
+        index=train_inx)
+    df_test_encoded = pd.DataFrame(
+        data=test_encoded_arr,
+        columns=encode_columns,
+        index=test_inx)
+
+    df_train[encode_columns] = df_train_encoded
+    df_test[encode_columns] = df_test_encoded
+
+    if show_info:
+        print(df_train_encoded.shape, df_test_encoded.shape)
+        display(df_train_encoded.describe().round(1))
+        display(df_test_encoded.describe().round(1))
+
+    return df_train, df_test

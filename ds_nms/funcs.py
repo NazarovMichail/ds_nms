@@ -44,41 +44,6 @@ def features_sum(df: pd.DataFrame,
     return df
 
 
-def df_encoding(
-            df_cat: pd.DataFrame,
-            y_train: pd.Series,
-            y_test: pd.Series,
-            encoder: TargetEncoder,
-            scaler: StandardScaler | MinMaxScaler
-            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-    cat_columns = list(df_cat.columns)
-    df_train_inx = y_train.index
-    df_test_inx = y_test.index
-
-    df_train_cat = df_cat.loc[df_train_inx, :]
-    df_test_cat = df_cat.loc[df_test_inx, :]
-
-    train_encoder = encoder
-    train_cat_arr = train_encoder.fit_transform(df_train_cat, y_train)
-    test_cat_arr = train_encoder.transform(df_test_cat)
-
-    df_train_cat_encoded = pd.DataFrame(train_cat_arr, columns=cat_columns, index=df_train_inx)
-    df_test_cat_encoded = pd.DataFrame(test_cat_arr, columns=cat_columns, index=df_test_inx)
-
-    if scaler is not None:
-        df_train_cat_encoded, df_test_cat_encoded = df_scaling(df_train=df_train_cat_encoded,
-                                                               df_test=df_test_cat_encoded,
-                                                               numerical_columns=cat_columns,
-                                                               scaler=scaler)
-        return df_train_cat_encoded, df_test_cat_encoded
-
-    print(df_train_cat_encoded.shape, df_test_cat_encoded.shape)
-    display(df_train_cat_encoded.describe().round(1))
-    display(df_test_cat_encoded.describe().round(1))
-
-    return df_train_cat_encoded, df_test_cat_encoded
-
 
 
 
