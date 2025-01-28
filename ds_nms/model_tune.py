@@ -319,7 +319,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     y_all.name = 'y_true'
 
     pred_df = pd.concat([X_all , y_all, y_pred_all], axis=1)
-
+    pred_df.drop_duplicates(inplace=True)
     pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
     pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 3) * 100
     pred_df['test_data'] = " "

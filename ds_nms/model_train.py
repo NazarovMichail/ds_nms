@@ -206,6 +206,40 @@ def get_feature_contrib(
 
     return df_contrib
 
+def plot_ts_pred(y_train: pd.Series,
+                y_pred_train: pd. Series,
+                y_test: pd.Series,
+                y_pred_test: pd.Series,
+                show_all: bool=False,
+                confidences=None,
+                title: str = "Прогноз",
+                xlabel: str = "Дата",
+                ylabel: str = 'Пассажиропоток'
+                ):
+
+    plt.style.use('ggplot')
+    plt.figure(figsize=(25, 20))
+    plt.plot(y_train, label='Тренировочные данные', marker='.', color='blue')
+    plt.plot(y_test, label='Действительные данные', color='green', marker='.')
+    plt.plot(y_pred_test, label='Прогноз', color='red', linestyle='--', marker='.')
+
+    if show_all:
+        plt.plot(y_pred_train, label='Прогноз тренировочных данных', color='orange', linestyle='--', marker='.')
+    if confidences:
+        plt.fill_between(
+            y_test.index,
+            confidences[:, 0],
+            confidences[:, 1],
+            color='red',
+            alpha=0.2,
+            label='Доверительный интервал',
+        )
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.legend()
+    plt.show()
+
 def relative_error(y_pred: np.array,
             y_true: pd.Series,
             re_threshold: int=30) -> int:
