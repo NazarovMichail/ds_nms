@@ -1,9 +1,5 @@
 .venv/
 data/
-data_test.ipynb
-data_ts_test.ipynb
-feature_select_test.ipynb
-model_tune_test.ipynb
 optuna_plots/
 .env
 mlruns/

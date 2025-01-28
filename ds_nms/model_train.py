@@ -1,31 +1,17 @@
-import pandas as pd
-from typing import List, Tuple, Any, Dict, Literal, Union
-import pickle
+from typing import Tuple, Literal, Union
 import os
-from sklearn.ensemble import IsolationForest
-import numpy as np
-from sklearn.feature_selection import RFE, SequentialFeatureSelector
-from lightgbm import LGBMRegressor
-from sklearn.base import BaseEstimator
-import optuna
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, PassiveAggressiveRegressor, LassoLars, BayesianRidge, HuberRegressor, QuantileRegressor, RANSACRegressor, TheilSenRegressor, PoissonRegressor, TweedieRegressor
-from sklearn.model_selection import train_test_split, KFold, cross_validate, StratifiedKFold, LeaveOneOut
 from tqdm import tqdm
+import numpy as np
+import pandas as pd
+from sklearn.base import BaseEstimator
+from sklearn.model_selection import KFold, StratifiedKFold, LeaveOneOut
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
+from sklearn.model_selection import TimeSeriesSplit
 from IPython.display import clear_output
-from  datetime import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import kstest, kruskal
-from sklearn.preprocessing import StandardScaler, RobustScaler, QuantileTransformer, Normalizer, MinMaxScaler, PowerTransformer, TargetEncoder, PolynomialFeatures
-from IPython.display import display
-from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error, r2_score, median_absolute_error, root_mean_squared_error
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-import mlflow
-from mlflow.models import infer_signature
-from permetrics.regression import RegressionMetric
 import shap
-from sklearn.decomposition import PCA
-from sklearn.model_selection import TimeSeriesSplit
 import dtreeviz
 
 
@@ -42,6 +28,8 @@ def get_feature_importance_df(X: pd.DataFrame,
          - 'features' (название признака)
          - 'importances' (вес признака или показатель важности)
     """
+    plt.style.use('ggplot')
+
     try:
         # Если у модели есть .coef_ (линейные модели)
         sorted_inds = np.abs(model.coef_).argsort()[::-1]
@@ -144,6 +132,79 @@ def get_importances_barplot(X: pd.DataFrame,
         shap.plots.bar(shap_values, show=True)
 
     return feature_importances_df
+
+def get_feature_contrib(
+    X_orig: pd.DataFrame,
+    model: BaseEstimator,
+    scaler: StandardScaler,
+    show_plot: bool=True,
+    title: str = "Вклад факторов в предсказание"
+) -> pd.DataFrame:
+    """Расчёт вкладов факторов для линейной модели,
+    обученной на стандартизированных данных
+
+    Args:
+        X_orig (pd.DataFrame): Датафрейм с исходными факторами
+        model (BaseEstimator): Обученная модель на стандартизированных данных
+        scaler (StandardScaler): Скейлер, которым производилась масштабирование
+
+    Returns:
+        pd.DataFrame: Датафрейм с вкладом кажого фактора в исходном мсаштабе,
+        с включенным свободным членом в каждый признак.
+        В сумме вклады дают значение целевой переменной
+    """
+    #-------------------------------------------
+    # Получение данных после стандартизации
+    #-------------------------------------------
+    means = scaler.mean_
+    std = scaler.scale_
+    W_std = model.coef_
+    b_std = model.intercept_
+
+    #-------------------------------------------
+    # Преобразование коэфф. в исходный масштаб
+    #-------------------------------------------
+    W_orig = W_std / std
+    b_orig = b_std - np.sum((W_std * means) / std)
+
+    #-------------------------------------------
+    # Включение свободного члена в признаки
+    #-------------------------------------------
+    b_orig_adj = b_orig / np.sum(W_orig)
+    X_with_b = X_orig + b_orig_adj
+
+    #-------------------------------------------
+    # Расчёт вкладов каждого признака
+    #-------------------------------------------
+    df_contrib = X_with_b * W_orig
+
+    #-------------------------------------------
+    # Сумма вкладов признака = Предсказание
+    #-------------------------------------------
+    contrib_sum = df_contrib.sum(axis=1)
+    model_preds = model.predict(scaler.transform(X_orig))
+    print(f"Сумма вкладов признаков и предсказание совпадают: {np.allclose(contrib_sum, model_preds)} -> {model_preds}")
+
+    print(f"Коэффициенты в исходном масштабе: {W_orig}")
+    print(f"Свободный член в исходном масштабе: {b_orig}")
+
+    if show_plot:
+        plt.style.use('ggplot')
+        plt.figure(figsize=(15,10))
+        ax = sns.barplot(df_contrib, orient='h', edgecolor='black', color='red', width=0.3)
+
+        for p in ax.patches:
+            ax.annotate(format(p.get_width(), '.0f'),  # Значение на конце столбца
+                        (p.get_width(), p.get_y() + p.get_height() / 2),  # Позиция текста
+                        ha='left', va='center',
+                        xytext=(2, 0),  # Смещение текста вправо
+                        textcoords='offset points')
+
+        plt.title(f'{title}')
+        plt.ylabel('Факторы')
+        plt.xlabel('Значения');
+
+    return df_contrib
 
 def relative_error(y_pred: np.array,
             y_true: pd.Series,
