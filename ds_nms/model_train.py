@@ -267,7 +267,9 @@ def get_prediction(
     model: BaseEstimator,
     re_threshold: int = 30,
     data_name: str = 'data_name',
-    metrics_type: str = None
+    metrics_type: str = None,
+    sarimax_train: bool = False,
+    sarimax_forecast: int = None
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """Возвращает датафрейм с метриками и массив предсказаний модели.
 
@@ -278,12 +280,25 @@ def get_prediction(
         re_threshold (int, optional): Пороовое значение относительной ошибки. Defaults to 30.
         data_name (str): Название данных. Defaults to 'data_name'
         metrics_type (str): Тип разделения данных (train / test ...) Defaults to None.
+        sarimax_train(bool): Рассчет метрик для модели auto_arima (Обучающие данные)
+        sarimax_forecast(int): Рассчет метрик для модели auto_arima (Период предсказания)
 
     Returns:
         Tuple[pd.DataFrame, pd.Series]: Кортеж датафрейма с метриками и массив предсказаний модели
     """
-    y_pred_arr = model.predict(X)
-    y_pred = pd.Series(data=y_pred_arr, index=X.index)
+    if sarimax_train:
+        y_pred, confidences = model.predict_in_sample(
+            start=0,
+            X=X,
+            return_conf_int=True)
+    if sarimax_forecast is not None:
+        y_pred, confidences = model.predict(
+            n_periods=sarimax_forecast,
+            X=X,
+            return_conf_int=True)
+    if sarimax_train is False and sarimax_forecast is None:
+        y_pred_arr = model.predict(X)
+        y_pred = pd.Series(data=y_pred_arr, index=X.index)
 
     RMSE = root_mean_squared_error(y, y_pred)
     MAE = mean_absolute_error(y, y_pred)
@@ -531,6 +546,7 @@ def train_cv(
             best_score_ind = results_dict[metric_best].argmax()
             best_model_split = models_history[best_score_ind]
 
+    # Обучение на всех обучающих данных
     best_model = best_model_split.fit(X, y)
     # -------------------------- #
     # 4. Сводный словарь с результатами
