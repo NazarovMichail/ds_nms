@@ -94,12 +94,13 @@ def get_stratified_df(X: pd.DataFrame, feature: pd.Series,
 
     return df_stratify
 
-def df_scaling(df_train: pd.DataFrame,
-                df_test: pd.DataFrame,
-                numerical_columns: List[str],
-                scaler: StandardScaler | MinMaxScaler | Normalizer | RobustScaler,
-                return_scaler: bool = False
-                ) -> Union[Tuple[pd.DataFrame, pd.DataFrame],
+def df_scaling(
+    df_train: pd.DataFrame,
+    df_test: pd.DataFrame,
+    numerical_columns: List[str],
+    scaler: StandardScaler | MinMaxScaler | Normalizer | RobustScaler,
+    return_scaler: bool = False
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame],
                             Tuple[pd.DataFrame, pd.DataFrame, Union[StandardScaler, MinMaxScaler, Normalizer, RobustScaler]]]:
     """Масштабирование числовых данных в тренировочном и тестовом наборах.
 

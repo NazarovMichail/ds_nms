@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
 import dtreeviz
+import pmdarima
+from pmdarima import auto_arima
 
 
 def get_feature_importance_df(X: pd.DataFrame,
@@ -214,20 +216,21 @@ def plot_ts_pred(y_train: pd.Series,
                 confidences=None,
                 title: str = "Прогноз",
                 xlabel: str = "Дата",
-                ylabel: str = 'Пассажиропоток'
+                ylabel: str = 'Y'
                 ):
 
     plt.style.use('ggplot')
     plt.figure(figsize=(25, 20))
     plt.plot(y_train, label='Тренировочные данные', marker='.', color='blue')
-    plt.plot(y_test, label='Действительные данные', color='green', marker='.')
+    if y_test is not None:
+        plt.plot(y_test, label='Действительные данные', color='green', marker='.')
     plt.plot(y_pred_test, label='Прогноз', color='red', linestyle='--', marker='.')
 
     if show_all:
         plt.plot(y_pred_train, label='Прогноз тренировочных данных', color='orange', linestyle='--', marker='.')
-    if confidences:
+    if confidences is not None:
         plt.fill_between(
-            y_test.index,
+            y_pred_test.index,
             confidences[:, 0],
             confidences[:, 1],
             color='red',
@@ -605,3 +608,258 @@ def train_cv(
     clear_output()
 
     return best_model, final_result
+
+def arima_train(
+    # Параметры auto_arima
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    start_p=0, max_p=1,     # Диапазон значений для параметра p
+    start_d=0, max_d=1,     # Диапазон значений для параметра d
+    start_q=0, max_q=1,     # Диапазон значений для параметра q
+    start_P=0, max_P=1,     # Диапазон значений для параметра P (сезонная AR)
+    start_D=0, max_D=1,     # Диапазон значений для параметра D (сезонная I)
+    start_Q=0, max_Q=1,     # Диапазон значений для параметра Q (сезонная MA)
+    seasonal: bool=True,
+    m=12,
+    trend: Literal['c', 't', 'ct', 'n', 'ctt'] = None,
+    with_intercept=True,
+    trace=False,             # Показывать процесс подбора параметров
+    error_action='ignore',  # Игнорировать ошибки при подборе
+    suppress_warnings=True, # Подавить предупреждения
+    stepwise=False,
+    arima_params: dict = {},
+    show_info: bool = True
+    ) -> pd.DataFrame:
+    """Обучение модели SARIMAX с автоматическим подбором параметров
+
+    Args:
+        X_train (pd.DataFrame): Обучающий датафрейм
+        y_train (pd.Series): Обучающие целевые переменные
+        X_test (pd.DataFrame): Тестовый датафрейм
+        y_test (pd.Series): тестовые целевые переменные
+        start_p (int, optional): Начало диапазона для параметра p (ar). Defaults to 0.
+        max_p (int, optional):  Конец диапазона для параметра p (ar). Defaults to 1.
+        start_d (int, optional): Начало диапазона для параметра d (i). Defaults to 0.
+        max_d (int, optional): Конец диапазона для параметра d (i). Defaults to 1.
+        start_q (int, optional): Начало диапазона для параметра q (ma). Defaults to 0.
+        max_q (int, optional): Конец диапазона для параметра q (ma). Defaults to 1.
+        start_P (int, optional): Начало диапазона для параметра P (сезонная AR). Defaults to 0.
+        max_P (int, optional): Конец диапазона для параметра P (сезонная AR). Defaults to 1.
+        start_D (int, optional): Начало диапазона для параметра D (сезонная I). Defaults to 0.
+        max_D (int, optional): Конец диапазона для параметра D (сезонная I). Defaults to 1.
+        start_Q (int, optional): Начало диапазона для параметра Q (сезонная MA). Defaults to 0.
+        max_Q (int, optional): Конец диапазона для параметра Q (сезонная MA). Defaults to 1.
+        m (int, optional): Периода сезонности. Defaults to 12.
+        trend (Literal[&#39;c&#39;, &#39;t&#39;, &#39;ct&#39;, &#39;n&#39;, &#39;ctt&#39;], optional): Включение в модель тренда:
+        - 'n': Не включать тренд
+        - 'c': Константа (как  свободный член в линейной регрессии)
+        - 't': Линейный тренд.
+        - 'ct': Линейный тренд + константа
+        - 'ctt': Квадратичный тренд
+        - None: Автоматически подобрать параметр. Defaults to None.
+        with_intercept (bool, optional): Включение в модель свободного члена. Defaults to True.
+        trace (bool, optional): Показывать процесс подбора параметров. Defaults to False.
+        arima_params (dict, optional): Дополнительные параметры модели. Defaults to {}.
+        show_info (bool, optional): Показать информацию об обучении модели. Defaults to True.
+
+    Returns:
+        pd.DataFrame: Результаты обучения модели:
+        - model: Обученная модель Sarimax
+        - train_metrics: Метрики качества для обучающих данных
+        - test_metrics: Метрики качества для тестовых данных
+        - pred_df: Датафрейм с предсказаниями
+    """
+    #----------------------------------------------------#
+    # Обучение SARIMAX с подпором параметров
+    #----------------------------------------------------#
+    auto_model = auto_arima(
+        y=y_train,
+        X=X_train,
+        seasonal=seasonal,
+        m=m,
+        trend=trend,
+        start_p=start_p, max_p=max_p,     # Диапазон значений для параметра p
+        start_q=start_q, max_q=max_q,     # Диапазон значений для параметра q
+        start_P=start_P, max_P=max_P,     # Диапазон значений для параметра P (сезонная AR)
+        start_Q=start_Q, max_Q=max_Q,     # Диапазон значений для параметра Q (сезонная MA)
+        start_d=start_d, max_d=max_d,     # Диапазон значений для параметра Q (сезонная MA)
+        start_D=start_D, max_D=max_D,     # Диапазон значений для параметра Q (сезонная MA)
+        trace=trace,             # Показывать процесс подбора параметров
+        error_action=error_action,  # Игнорировать ошибки при подборе
+        suppress_warnings=suppress_warnings, # Подавить предупреждения
+        stepwise=stepwise,
+        with_intercept=with_intercept,
+        arima_params=arima_params
+        )
+
+    y_all = pd.concat([y_train, y_test])
+    X_train_test_all = pd.concat([X_train, X_test])
+    #----------------------------------------------------#
+    # Получение метрик
+    #----------------------------------------------------#
+    train_metrics, y_pred_train = get_prediction(
+                                X=X_train,
+                                y=y_train[:],
+                                model=auto_model,
+                                sarimax_train=True,
+                                metrics_type='train')
+    test_metrics, y_pred_test = get_prediction(
+                                X=X_test,
+                                y=y_test,
+                                model=auto_model,
+                                sarimax_forecast=len(y_test),
+                                metrics_type='test')
+
+    #----------------------------------------------------#
+    # Создание датафрейма с предсказаниями
+    #----------------------------------------------------#
+    y_pred_all = pd.concat([y_pred_train, y_pred_test])
+    y_pred_all.name = 'y_pred'
+    y_all.name = 'y_true'
+
+    pred_df = pd.concat([X_train_test_all , y_all, y_pred_all], axis=1)
+    pred_df.drop_duplicates(inplace=True)
+    pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
+    pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 3) * 100
+    pred_df['test_data'] = " "
+    pred_df.loc[y_test.index, 'test_data'] = "X"
+
+    #----------------------------------------------------#
+    # Сохранение всех рез-ов обучения
+    #----------------------------------------------------#
+    train_results = {}
+    train_results['model'] = auto_model
+    train_results['train_metrics'] = train_metrics
+    train_results['test_metrics'] = test_metrics
+    train_results['pred_df'] = pred_df
+
+    #----------------------------------------------------#
+    # Визуализация результатов обучения
+    #----------------------------------------------------#
+    if show_info:
+        print(auto_model.summary())
+        diagnostic_plot = auto_model.plot_diagnostics(figsize=(10, 10))
+        plot_ts_pred(
+            y_train=y_train,
+            y_pred_train=y_pred_train,
+            y_test=y_test,
+            y_pred_test=y_pred_test,
+            show_all=True
+        )
+    return train_results
+
+def arima_predict(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_pred: pd.DataFrame,
+    arima_trained_params: dict,
+    show_info:bool = True,
+    title: str = 'Прогноз',
+    ylabel: str = 'Целевая переменная',
+    show_conf: bool = True,
+    ) -> pd.DataFrame:
+    """Предсказание временного ряда на заданный период
+
+    Args:
+        X_train (pd.DataFrame): Обучающий датафрейм
+        y_train (pd.Series): Обучающие целевые переменные
+        X_pred (pd.DataFrame): Датафрейм с экзогенными переменными для периода предсказания
+        arima_trained_params (dict): Параметры обученной модели SARIMAX
+        show_info (bool, optional): Показывать график с предсказаниями и результаты обучения модели. Defaults to True.
+        title (str, optional): Название графика. Defaults to 'Прогноз'.
+        ylabel (str, optional): Название целевой переменной. Defaults to 'Y'.
+        freq_tick (str, optional): Интервал дат для отображения на графике. Defaults to None.
+        show_conf (bool, optional): Показывать доверительный интервал. Defaults to True.
+
+    Returns:
+        pd.DataFrame: Результаты обучения модели:
+        - model: Обученная модель Sarimax
+        - train_metrics: Метрики качества для обучающих данных
+        - pred_df: Датафрейм с предсказаниями
+    """
+    auto_model = auto_arima(
+        y=y_train,
+        X=X_train,
+        **arima_trained_params
+        )
+
+    train_metrics, y_pred_train = get_prediction(
+                            X=X_train,
+                            y=y_train,
+                            model=auto_model,
+                            sarimax_train=True,
+                            metrics_type='train')
+
+    n_periods = len(X_pred)
+    y_pred, conf = auto_model.predict(
+            n_periods=n_periods,
+            X=X_pred,
+            return_conf_int=True)
+
+    pred_df = pd.DataFrame(data=y_pred, columns=['Прогноз'])
+
+    if show_info:
+        print(auto_model.summary())
+        diagnostic_plot = auto_model.plot_diagnostics(figsize=(10, 10))
+        if show_conf:
+            plot_ts_pred(
+                y_train=y_train,
+                y_pred_train=y_pred_train,
+                y_test=None,
+                y_pred_test=y_pred,
+                show_all=True,
+                confidences=conf
+            )
+        else:
+            plot_ts_pred(
+                y_train=y_train,
+                y_pred_train=y_pred_train,
+                y_test=None,
+                y_pred_test=y_pred,
+                show_all=True,
+                title=title,
+                ylabel=ylabel
+            )
+    #----------------------------------------------------#
+    # Сохранение всех рез-ов обучения
+    #----------------------------------------------------#
+    train_results = {}
+    train_results['model'] = auto_model
+    train_results['train_metrics'] = train_metrics
+    train_results['pred_df'] = pred_df
+
+    return train_results
+
+def get_feat_importance_arima(model: pmdarima.arima.arima.ARIMA,
+                              start_inx: int,
+                              end_inx: int
+                              ) -> pd.Series:
+    """Построение графика важности признаков для SARIMAX
+
+    Args:
+        model (pmdarima.arima.arima.ARIMA): Обученная модель SARIMAX
+        start_inx (int): Начальный индекс коэффициентов модели для отображения
+        end_inx (int): Конечный индекс коэффициентов модели для отображения
+
+    Returns:
+        pd.Series: Коэффициенты модели
+    """
+    coefs = model.params()
+    coefs_rel = (coefs[start_inx:end_inx] / abs(coefs[start_inx:end_inx]).sum())
+    coefs_rel_sorted =  (coefs_rel).reindex((coefs_rel).abs().sort_values(ascending=True).index)
+    coefs_names = coefs_rel_sorted.index
+
+    fig = plt.figure(figsize=(15,10))
+    plt.barh(coefs_names, coefs_rel_sorted, color="red", height=0.3, edgecolor='black' )
+
+    for index, value in enumerate(coefs_rel_sorted):
+        plt.text(value, index, f"{value:.2f}", va="center", ha="left" if value > 0 else "right")
+
+    plt.title("Важность факторов")
+    plt.xlabel("Относительные коэффициенты")
+    plt.ylabel("Параметры модели")
+    plt.show()
+
+    return coefs

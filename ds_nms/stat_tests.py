@@ -190,13 +190,13 @@ def stationarity_test(
     kpss_p_value = kpss_result[1]
 
     if adf_p_value < alpha and kpss_p_value < alpha:
-        print("Ряд на грани стационарности")
-    if adf_p_value < alpha and kpss_p_value > alpha:
-        print("Ряд стационарен")
-    if adf_p_value > alpha and kpss_p_value < alpha:
-        print("Ряд нестационарен")
+        print("Результат ADF-теста и KPSS-теста: Ряд на грани стационарности")
+    elif adf_p_value < alpha and kpss_p_value > alpha:
+        print("Результат ADF-теста и KPSS-теста: Ряд стационарен")
+    elif adf_p_value > alpha and kpss_p_value < alpha:
+        print("Результат ADF-теста и KPSS-теста: Ряд нестационарен")
     else:
-        print("ряд тренд-стационарный. Для стационарности удалить тренд")
+        print("Результат ADF-теста и KPSS-теста: Ряд тренд-стационарный. Для стационарности удалить тренд")
 
     result = {"ADF": adf_result,"KPSS": kpss_result}
 
