@@ -6,24 +6,25 @@ ___
 
 ___
 # <center>Структура репозитория
-
-📦 Репозиторий (название проекта)
-├──ds_nms/
-│   ├── data_proc.py
-│   ├── feature_select.py
-│   ├── model_train.py
-│   ├── model_tune.py
-│   ├── model_tune_params.py
-│   ├── stat_tests.py
-│   ├── utils_io.py
-│   └── __init__.py
+```
+📦 Репозиторий (ds_nms)
+├── 📂 ds_nms/                  [Основной пакет библиотеки]
+│   ├── 📄 data_proc.py         [Обработка и предобработка данных]
+│   ├── 📄 feature_select.py    [Отбор значимых признаков]
+│   ├── 📄 model_train.py       [Обучение моделей]
+│   ├── 📄 model_tune.py        [Оптимизация гиперпараметров]
+│   ├── 📄 model_tune_params.py [Параметры моделей]
+│   ├── 📄 stat_tests.py        [Статистические тесты]
+│   ├── 📄 utils_io.py          [Вспомогательные утилиты]
+│   └── 📄 __init__.py          [Файл инициализации пакета]
 │
-├── 📂 install/
-│   └── 📄 install_ds_nms.py
+├── 📂 install/                [Директория установки]
+│   └── 📄 install_ds_nms.py   [Скрипт установки пакета в виртуальное окружение]
 │
-├── 📂 examples/
-│   ├── 📄 example1.ipynb
+├── 📂 examples/               [Примеры использования]
+│   ├── 📄 example1.ipynb      [Jupyter Notebook с примерами работы]
 │   ├── 📄 example2.ipynb
 │   └── ...
 │
 └── 📄 README.md
+```
