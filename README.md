@@ -39,7 +39,7 @@ ___
 Установка осуществляется через скрипт install_ds_nms.py, который автоматически создает виртуальное окружение и устанавливает пакет из GitHub.
 
 Шаги установки:
-1. Из директории репозитория `install/` скачать в рабочую директорию файл `install_ds_nms.py`
+1. Из директории репозитория [install/](https://github.com/NazarovMichail/ds_nms/tree/master/install) скачать в рабочую директорию файл [install_ds_nms.py](https://github.com/NazarovMichail/ds_nms/blob/master/install/install_ds_nms.py)
 2. Выполните команду:
 
  ```bash
