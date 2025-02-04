@@ -22,5 +22,5 @@ setup(
     description='Пакет для анализа данных и машинного обучения',
     author='Назаров Михаил',
     packages=find_packages(),
-    install_requires=parse_requirements('requirements.txt')
+    install_requires=parse_requirements('r_r.txt')
 )

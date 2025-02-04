@@ -1,6 +1,6 @@
+.env
 .venv/
 data/
 optuna_plots/
-.env
 mlruns/
 models/
