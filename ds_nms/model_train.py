@@ -64,7 +64,20 @@ def get_importances_barplot(X: pd.DataFrame,
                             show_shap: bool = True,
                             y: pd.Series = None #Только для визуализации дерева
                             ) -> pd.DataFrame:
+    """Рисует столбчатый график важности факторов
 
+    Args:
+        X (pd.DataFrame): Исходный датафрейм
+        model (BaseEstimator): Обученная модель
+        model_name (str, optional): Название модели для отображения на графике. Defaults to "model".
+        figsize (Tuple[int], optional): Размер графика. Defaults to (20,10).
+        save_dir (str, optional): Директория для сохранения графика. Defaults to None.
+        show_shap (bool, optional): SHAP-важность факторов. Defaults to True.
+        y (pd.Series, optional): Целевые переменные для визуализации дерева решений. Defaults to None#Толькодлявизуализациидерева.
+
+    Returns:
+        pd.DataFrame: Датафрейм важности признаков
+    """
     plt.style.use('ggplot')
 
     #---------------------------------------------------------------------------#
