@@ -158,3 +158,30 @@ ___
 - mlflow_server_start: Запускает сервер MLflow для логирования экспериментов
 - mlflow_run_delete: Удаляет логи MLflow из базы данных PostgreSQL
 
+___
+# <center>Примеры использования
+
+- [data_proc_test.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/data_proc_test.ipynb): Тестирование функций предобработки данных, включая обнаружение выбросов, масштабирование, кодирование категориальных признаков и анализ корреляции.
+    - data_proc
+    - stat_tests
+    - utils_io
+
+- [data_ts_test.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/data_ts_test.ipynb): Анализ и обработка временных рядов, включая разложение сезонности, обучение моделей и оценку качества прогнозирования
+    - model_train
+
+- [feature_contribution.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/feature_contribution.ipynb): Анализ вклада признаков в предсказания моделей с использованием методов интерпретируемости, таких как коэффициенты линейных моделей и SHAP-значения.
+    - model_train
+
+- [feature_select_test.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/feature_select_test.ipynb): Проверка методов отбора признаков
+    - feature_select
+    - utils_io
+
+- [model_tune_test.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/model_tune_test.ipynb): Оптимизация гиперпараметров моделей с использованием Optuna, оценка качества моделей и сохранение лучших конфигураций.
+    - model_tune
+    - model_tune_params
+    - model_train
+    - utils_io
+
+- [training_test.ipynb](#https://github.com/NazarovMichail/ds_nms/blob/master/examples/training_test.ipynb): Проверка функций обучения моделей, расчета метрик и визуализации предсказаний.
+    - model_train
+    - utils_io
