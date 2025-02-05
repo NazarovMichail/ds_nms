@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+import os
 import chardet
 
 
@@ -16,21 +17,21 @@ def parse_requirements(filename):
 filename = "requirements.txt"
 
 
-try:
+if os.name == 'nt':
     setup(
         name='ds_nms',
         version='0.1',
         description='Пакет для анализа данных и машинного обучения',
         author='Назаров Михаил',
         packages=find_packages(),
-        install_requires=parse_requirements('requirements.txt')
-    )
-except Exception:
-        setup(
-        name='ds_nms',
-        version='0.1',
-        description='Пакет для анализа данных и машинного обучения',
-        author='Назаров Михаил',
-        packages=find_packages(),
         install_requires=parse_requirements('requirements_win.txt')
-        )
+    )
+else:
+    setup(
+    name='ds_nms',
+    version='0.1',
+    description='Пакет для анализа данных и машинного обучения',
+    author='Назаров Михаил',
+    packages=find_packages(),
+    install_requires=parse_requirements('requirements.txt')
+    )
