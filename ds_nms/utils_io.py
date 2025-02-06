@@ -127,12 +127,14 @@ def mlflow_server_start():
     USER_ML = os.getenv("USER_ML")
     PASS_ML = os.getenv("PASS_ML")
     BD_ML = os.getenv("BD_ML")
+    PORT_ML = os.getenv("PORT_ML")
+    HOST_ML = os.getenv("HOST_ML")
 
     cmd = [
         "mlflow",
         "server",
         "--backend-store-uri",
-        f"postgresql://{USER_ML}:{PASS_ML}@localhost:5432/{BD_ML}",
+        f"postgresql://{USER_ML}:{PASS_ML}@{HOST_ML}:5432/{BD_ML}",
         "--default-artifact-root",
         "mlruns/",
         "--serve-artifacts"
@@ -151,7 +153,10 @@ def mlflow_run_delete() -> None:
     USER_ML = os.getenv("USER_ML")
     PASS_ML = os.getenv("PASS_ML")
     BD_ML = os.getenv("BD_ML")
-    engine = create_engine(f"postgresql://{USER_ML}:{PASS_ML}@localhost:5432/{BD_ML}")
+    PORT_ML = os.getenv("PORT_ML")
+    HOST_ML = os.getenv("HOST_ML")
+
+    engine = create_engine(f"postgresql://{USER_ML}:{PASS_ML}@{HOST_ML}:{PORT_ML}/{BD_ML}")
 
     queries = """
         DELETE FROM experiment_tags WHERE experiment_id=ANY(SELECT experiment_id FROM experiments where lifecycle_stage='deleted');
