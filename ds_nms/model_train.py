@@ -302,9 +302,10 @@ def get_prediction(
     Returns:
         Tuple[pd.DataFrame, pd.Series]: Кортеж датафрейма с метриками и массив предсказаний модели
     """
+
     if sarimax_train:
         y_pred, confidences = model.predict_in_sample(
-            start=0,
+            start=y.index[0],
             X=X,
             return_conf_int=True)
     if sarimax_forecast is not None:
@@ -708,7 +709,10 @@ def arima_train(
         )
 
     y_all = pd.concat([y_train, y_test])
-    X_train_test_all = pd.concat([X_train, X_test])
+    if X_train is not None:
+        X_train_test_all = pd.concat([X_train, X_test])
+    else:
+        X_train_test_all = None
     #----------------------------------------------------#
     # Получение метрик
     #----------------------------------------------------#
@@ -732,7 +736,10 @@ def arima_train(
     y_pred_all.name = 'y_pred'
     y_all.name = 'y_true'
 
-    pred_df = pd.concat([X_train_test_all , y_all, y_pred_all], axis=1)
+    if X_train_test_all is not None:
+        pred_df = pd.concat([X_train_test_all , y_all, y_pred_all], axis=1)
+    else:
+        pred_df = pd.concat([ y_all, y_pred_all], axis=1)
     pred_df.drop_duplicates(inplace=True)
     pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
     pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 3) * 100
