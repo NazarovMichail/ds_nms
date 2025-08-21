@@ -15,6 +15,7 @@ import shap
 import dtreeviz
 import pmdarima
 from pmdarima import auto_arima
+from sklearn.base import clone
 
 
 def get_feature_importance_df(X: pd.DataFrame,
@@ -271,7 +272,7 @@ def relative_error(y_pred: np.array,
     """
 
     re = abs(y_pred - y_true)
-    re_relative = (re / (y_pred + 1e-8)) * 100
+    re_relative = (re / (y_true + 1e-8)) * 100
     count_less_thresh = re_relative[re_relative < re_threshold].shape[0]
     count_less_thresh_ratio = count_less_thresh / y_true.shape[0]
 
@@ -466,7 +467,7 @@ def train_cv(
     elif cv_type == 'kf':
         cv_splitter = KFold(
             n_splits=n_splits,
-            shuffle=shuffle
+            shuffle=shuffle,
         )
         split_iter = cv_splitter.split(X)
         desc_text = f"KFold (n_splits={n_splits})"
@@ -490,15 +491,16 @@ def train_cv(
     # -------------------------- #
     progrbar = tqdm(split_iter, total=cv_splitter.get_n_splits(X), desc=desc_text)
     for train_idx, val_idx in progrbar:
+        model_i = clone(model)
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        model.fit(X_train, y_train)
+        model_i.fit(X_train, y_train)
 
         # Получаем метрики на train
-        metrics_train_df, y_train_pred = get_prediction(X_train, y_train, model)
+        metrics_train_df, y_train_pred = get_prediction(X_train, y_train, model_i)
         # Получаем метрики на val
-        metrics_val_df, y_val_pred = get_prediction(X_val, y_val, model)
+        metrics_val_df, y_val_pred = get_prediction(X_val, y_val, model_i)
 
         R2_train = metrics_train_df.get("R2", np.nan)
         RMSE_train = metrics_train_df["RMSE"]
@@ -529,7 +531,7 @@ def train_cv(
         results_dict['RE_val'].append(RE_val)
         results_dict['negative_val'].append(negative_val)
 
-        models_history.append(model)
+        models_history.append(model_i)
         y_val_full.append(y_val)
         y_pred_full.append(y_val_pred)
 

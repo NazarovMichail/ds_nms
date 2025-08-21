@@ -31,9 +31,9 @@ def get_best_study_params(study: optuna.study.study.Study,
         filtered_df_1 = results_df[results_df['values_1'] > threshold]
 
     if direction_1 == "maximize":
-        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].max()]
+        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].max() ]
     else:
-        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].min()]
+        best_results = filtered_df_1[filtered_df_1['values_0'] == filtered_df_1['values_0'].min() ]
     try:
         best_ind = best_results.index[0]
         params = study.get_trials()[best_ind].params
@@ -203,7 +203,7 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                                    threshold=threshold,
                                    direction_1=direction_1,
                                    direction_2=direction_2)
-
+    base_params_out = (model_params.get("base_params") or {}).copy()
     clear_output()
 
 
@@ -214,7 +214,7 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                 name_metric_2=f"{metric_2}",
                 model_name=model_cls.__name__ )
 
-    return best_params, study
+    return best_params, base_params_out, study
 
 def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                         X_test: pd.DataFrame, y_test: pd.Series,
@@ -265,7 +265,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     #----------------------------------------------------#
     # Подбор оптимальных параметров модели
     #----------------------------------------------------#
-    best_params, study = get_optimize_params(X_train=X_train, y_train=y_train, X_test=X_test,
+    best_params, base_params, study = get_optimize_params(X_train=X_train, y_train=y_train, X_test=X_test,
                                             metric_1=metric_1,
                                             metric_2=metric_2,
                                             direction_1=direction_1,
@@ -284,8 +284,17 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     #----------------------------------------------------#
     # Обучение модели с подобранными параметрами
     #----------------------------------------------------#
+    if base_params is None:
+        base_params = {}
+    elif not isinstance(base_params, dict):
+        base_params = dict(base_params)
+    if model_cls == StackingRegressor and final_estim_cls is not None:
+        base = model_params.get('base_params', {})
+        model_final = model_cls(**base, final_estimator=final_estim_cls(**best_params))
+    else:
+        model_final = model_cls(**best_params, **base_params)
     best_trained_model, cv_metrics = model_train.train_cv(X=X_train, y=y_train,
-                                                    model=model_cls(**best_params),
+                                                    model=model_final,
                                                     cv_type=cv_type,
                                                     n_splits=n_splits,
                                                     train_size=train_size,
@@ -318,7 +327,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     y_all.name = 'y_true'
 
     pred_df = pd.concat([X_all , y_all, y_pred_all], axis=1)
-    pred_df.drop_duplicates(inplace=True)
+    # pred_df.drop_duplicates(inplace=True)
     pred_df['abs_error'] = pred_df['y_pred'] - pred_df['y_true']
     pred_df['rel_error'] = round(abs(pred_df['abs_error'] / pred_df['y_true']), 3) * 100
     pred_df['test_data'] = " "
