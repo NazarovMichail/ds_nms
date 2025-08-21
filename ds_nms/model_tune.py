@@ -1,3 +1,4 @@
+import copy
 from typing import List, Tuple, Any, Dict, Literal
 import os
 from  datetime import datetime as dt
@@ -61,6 +62,60 @@ def get_best_study_params(study: optuna.study.study.Study,
 
     return params
 
+# def get_best_study_params(
+#     study: optuna.study.Study,
+#     threshold: float | int,
+#     direction_1: Literal["minimize", "maximize"] = "minimize",
+#     direction_2: Literal["minimize", "maximize"] = "maximize",
+# ):
+#     import numpy as np
+#     import pandas as pd
+#     from IPython.display import display
+
+#     df = study.trials_dataframe()
+
+#     # 1) оставляем только завершённые трейлы
+#     if "state" in df.columns:
+#         df = df[df["state"] == "COMPLETE"].copy()
+
+#     # 2) чистим inf/NaN и проверяем наличие нужных столбцов
+#     for col in ("values_0", "values_1"):
+#         if col not in df.columns:
+#             raise ValueError(
+#                 f"В trials_dataframe отсутствует {col}. "
+#                 "Убедитесь, что objective возвращает ДВА значения."
+#             )
+#     df[["values_0", "values_1"]] = df[["values_0", "values_1"]].replace([np.inf, -np.inf], np.nan)
+#     df = df.dropna(subset=["values_0", "values_1"])
+#     if df.empty:
+#         raise ValueError("Нет валидных трейлов после очистки (NaN/inf/неуспешные).")
+
+#     # 3) фильтруем по второй цели; для стабильности — по модулю
+#     #    если direction_2='minimize', хотим |values_1| < threshold
+#     #    если direction_2='maximize', обычно фильтр не нужен — но оставим симметрию:
+#     df = df.assign(abs_v1=df["values_1"].abs())
+#     if direction_2 == "minimize":
+#         filtered = df[df["abs_v1"] < threshold].copy()
+#     else:
+#         filtered = df[df["abs_v1"] > 0]  # фактически безжатый фильтр
+
+#     # fallback: если отфильтровали всё — работаем по всей выборке
+#     if filtered.empty:
+#         filtered = df
+
+#     # 4) выбираем лучшую строку по первой цели
+#     if direction_1 == "maximize":
+#         idx = filtered["values_0"].idxmax()
+#     else:
+#         idx = filtered["values_0"].idxmin()
+
+#     best_row = filtered.loc[idx]
+#     best_trial_number = int(best_row["number"])
+#     params = study.trials[best_trial_number].params
+
+#     display(best_row.to_frame().T)
+#     return params
+
 def optuna_plot(study: optuna.study.study.Study,
                 directory: str = None,
                 param_importances: bool=False,
@@ -107,7 +162,7 @@ def extract_model_params(trial: optuna.Trial,
     model_params_base = {}
     for param_name, cfg in param_dict.items():
         if param_name == "base_params":
-            model_params_base = cfg
+            model_params_base = copy.deepcopy(cfg)
         else:
             param_type = cfg["type"]
             args = cfg["args"]
@@ -289,8 +344,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     elif not isinstance(base_params, dict):
         base_params = dict(base_params)
     if model_cls == StackingRegressor and final_estim_cls is not None:
-        base = model_params.get('base_params', {})
-        model_final = model_cls(**base, final_estimator=final_estim_cls(**best_params))
+        model_final = model_cls(**base_params, final_estimator=final_estim_cls(**best_params))
     else:
         model_final = model_cls(**best_params, **base_params)
     best_trained_model, cv_metrics = model_train.train_cv(X=X_train, y=y_train,
