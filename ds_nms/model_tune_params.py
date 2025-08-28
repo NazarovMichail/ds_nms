@@ -313,6 +313,22 @@ class ModelsParams():
                            "random_state": 1}
         }
 
+##########################################################################
+# POISSON
+        self.poisson = {
+            "alpha": {
+                "type": "float",
+                "args": [0, 1000],
+                "kwargs": {"log": False}
+            },
+            "solver": {
+                "type": "categorical",
+                "args": [['lbfgs', 'newton-cholesky']],
+                "kwargs": {}
+            },
+            "base_params": {
+                            "max_iter": 150000}
+        }
 # $$$$$$$\                                          $$$$$$$\  $$\       $$\
 # $$  __$$\                                         $$  __$$\ \__|      $$ |
 # $$ |  $$ | $$$$$$\  $$\   $$\  $$$$$$\   $$$$$$$\ $$ |  $$ |$$\  $$$$$$$ | $$$$$$\   $$$$$$\

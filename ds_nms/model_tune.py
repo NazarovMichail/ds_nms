@@ -179,6 +179,7 @@ def extract_model_params(trial: optuna.Trial,
 
 def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                         X_test: pd.DataFrame,
+                        groups: pd.Series,
                         metric_1: Literal["R2_val_macro",
                                           "RMSE_val_macro",
                                           "MAE_val_macro",
@@ -239,7 +240,8 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                                                metric_best=metric_best,
                                                n_splits=n_splits,
                                                train_size=train_size,
-                                               val_size=val_size)
+                                               val_size=val_size,
+                                               groups=groups)
 
         y_pred = best_model.predict(X_all)
         negative_all = (y_pred < 0).sum()
@@ -273,6 +275,7 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
 
 def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                         X_test: pd.DataFrame, y_test: pd.Series,
+                        groups: pd.Series,
                         metric_1: Literal["R2_val_macro",
                                           "RMSE_val_macro",
                                           "MAE_val_macro",
@@ -301,7 +304,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                         direction_2: Literal["minimize", "maximize"]="minimize",
                         n_trials: int=100,
                         threshold=0.11,
-                        cv_type: Literal['kf', 'loo', 'stratify', 'ts']='loo',
+                        cv_type: Literal['kf', 'loo', 'stratify', 'ts', 'group_kf']='loo',
                         metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ]='MAE_val',
                         show_plots: bool = True,
                         n_splits: int = 5,
@@ -320,7 +323,8 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     #----------------------------------------------------#
     # Подбор оптимальных параметров модели
     #----------------------------------------------------#
-    best_params, base_params, study = get_optimize_params(X_train=X_train, y_train=y_train, X_test=X_test,
+    best_params, base_params, study = get_optimize_params(X_train=X_train, y_train=y_train,             X_test=X_test,
+                                            groups=groups,
                                             metric_1=metric_1,
                                             metric_2=metric_2,
                                             direction_1=direction_1,
@@ -354,7 +358,8 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                                                     train_size=train_size,
                                                     val_size=val_size,
                                                     metric_best=metric_best,
-                                                    data_name=data_name)
+                                                    data_name=data_name,
+                                                    groups=groups)
 
     #----------------------------------------------------#
     # Получение метрик

@@ -109,7 +109,8 @@ def df_scaling(
     df_test_num = df_test[numerical_columns]
 
     train_scaler = scaler
-    train_scaler.fit(df_train_num)
+    fitted_scaler = train_scaler.fit(df_train_num)
+
 
     array_train_num_scaled = train_scaler.transform(df_train_num)
     array_test_num_scaled = train_scaler.transform(df_test_num)
@@ -121,7 +122,7 @@ def df_scaling(
     display(df_test_num_scaled.describe().round(1))
 
     if return_scaler:
-        return df_train_num_scaled, df_test_num_scaled, train_scaler
+        return df_train_num_scaled, df_test_num_scaled, fitted_scaler
 
     return df_train_num_scaled, df_test_num_scaled
 

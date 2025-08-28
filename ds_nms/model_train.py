@@ -4,7 +4,7 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import KFold, StratifiedKFold, LeaveOneOut
+from sklearn.model_selection import KFold, StratifiedKFold, LeaveOneOut, GroupKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
@@ -84,6 +84,7 @@ def get_importances_barplot(X: pd.DataFrame,
     #---------------------------------------------------------------------------#
     # Важность признаков для моделей с аттрибутами .coef_ / .feature_importances_
     #---------------------------------------------------------------------------#
+    feature_importances_df=None
     try:
         feature_importances_df = get_feature_importance_df(X=X, model=model)
 
@@ -111,6 +112,7 @@ def get_importances_barplot(X: pd.DataFrame,
             plt.savefig(f"{save_dir}/FE_bar_{model_name}.png", dpi=300)
         plt.show()
     except Exception as e:
+
         print(e)
 
     #------------------------------#
@@ -139,15 +141,15 @@ def get_importances_barplot(X: pd.DataFrame,
                        y_train=y,
                        feature_names=X.columns,
                        target_name='y'
-                       ).view(scale=3, fontname=None, ticks_fontsize=5, label_fontsize=5).save(f'{save_dir}/DT_viz.svg')
+                       ).view(scale=3, ticks_fontsize=5, label_fontsize=5).save(f'{save_dir}/DT_viz.svg')
             except Exception:
                 ...
     if show_shap:
         shap.summary_plot(shap_values, show=True)
         plt.close()
         shap.plots.bar(shap_values, show=True)
-
-    return feature_importances_df
+    if get_importances_barplot is not None:
+        return feature_importances_df
 
 def get_feature_contrib(
     X_orig: pd.DataFrame,
@@ -354,18 +356,20 @@ def get_prediction(
 
     return metrics_df, y_pred
 
+
 def train_cv(
     X: pd.DataFrame,
     y: pd.Series,
     model: BaseEstimator,
-    cv_type: Literal['kf', 'loo', 'stratify', 'ts'],
+    cv_type: Literal['kf', 'loo', 'stratify', 'ts', 'group_kf'],
     metric_best: Literal['R2_val', 'RMSE_val', 'NRMSE_val', 'MAE_val', 'RE_val' ],
     stratify: Union[str, None] = 'quantile',  # только для 'stratify'
     n_splits: int = 5,                       # KFold / StratifiedKFold
     shuffle: bool = False,                   # KFold / StratifiedKFold
     train_size: int = 48,                    # TimeSeriesSplit
     val_size: int = 12,                      # TimeSeriesSplit
-    data_name: Union[str, None] = None
+    data_name: Union[str, None] = None,
+    groups: Union[pd.Series, np.ndarray, None] = None
 ) -> Tuple[BaseEstimator, dict]:
     """
     Единая функция для обучения модели с разными схемами кросс-валидации:
@@ -480,11 +484,18 @@ def train_cv(
         )
         split_iter = cv_splitter.split(X)
         desc_text = f"TimeSeriesSplit (n_splits={n_splits_ts})"
+    elif cv_type == 'group_kf':
+        if groups is None:
+            raise ValueError("Для 'group_kf' необходимо передать параметр 'groups' (например, object id).")
+        if isinstance(groups, pd.Series):
+            groups_used = groups.reset_index(drop=True)
+        else:
+            groups_used = pd.Series(groups).reset_index(drop=True)
+        cv_splitter = GroupKFold(n_splits=n_splits)
+        split_iter = cv_splitter.split(X, y, groups=groups_used)
+        desc_text = f"GroupKFold (n_splits={n_splits})"
     else:
-        raise ValueError(
-            f"Неверный cv_type='{cv_type}'. "
-            f"Допустимые: 'stratify', 'loo', 'kf', 'ts'."
-        )
+        raise ValueError(f"Неверный cv_type='{cv_type}'. Допустимые: 'stratify', 'loo', 'kf', 'ts', 'group_kf'.")
 
     # -------------------------- #
     # 2. Основной цикл
@@ -609,21 +620,31 @@ def train_cv(
 
     # Метрики разности валидационных значений и обучающих
     if cv_type == 'loo':
-        R2_diff = abs(final_result['R2_train_macro'] - final_result['R2_val_micro'])
+        if final_result['R2_train_macro'] > 0 and final_result['R2_val_micro'] > 0:
+            R2_diff = abs(final_result['R2_train_macro'] - final_result['R2_val_micro'])
+        else:
+            R2_diff = np.inf
         RMSE_diff = abs(final_result['RMSE_train_macro'] - final_result['RMSE_val_micro'])
         MAE_diff = abs(final_result['MAE_train_macro'] - final_result['MAE_val_macro'])
     else:
-        R2_diff = (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean()
+        if (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean() > 0:
+            R2_diff = (final_result['R2_train_splits'] - final_result['R2_val_splits']).mean()
+        else:
+            R2_diff = np.inf
         RMSE_diff = abs(final_result['RMSE_train_splits'] - final_result['RMSE_val_splits']).mean()
         MAE_diff = abs(final_result['MAE_train_splits'] - final_result['MAE_val_splits']).mean()
 
-    final_result['R2_diff_rel'] = R2_diff / final_result['R2_train_macro']
+    if final_result['R2_train_macro'] > 0:
+        final_result['R2_diff_rel'] = R2_diff / final_result['R2_train_macro']
+    else:
+        final_result['R2_diff_rel'] = np.inf
     final_result['RMSE_diff_rel'] = RMSE_diff / final_result['RMSE_train_macro']
     final_result['MAE_diff_rel'] = MAE_diff / final_result['MAE_train_macro']
 
     clear_output()
 
     return best_model, final_result
+
 
 def arima_train(
     # Параметры auto_arima
