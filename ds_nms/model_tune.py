@@ -216,7 +216,8 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                         data_name: str=None,
                         model_cls: BaseEstimator = None,
                         model_params: Dict[str, dict] = None,
-                        final_estim_cls: BaseEstimator = None # Только для Stacking
+                        final_estim_cls: BaseEstimator = None, # Только для Stacking
+                        y_transform = lambda y: y
                         ) -> Tuple[dict, Any, optuna.study.study.Study]:
 
     if model_cls is None:
@@ -241,7 +242,9 @@ def get_optimize_params(X_train: pd.DataFrame, y_train: pd.Series,
                                                n_splits=n_splits,
                                                train_size=train_size,
                                                val_size=val_size,
-                                               groups=groups)
+                                               groups=groups,
+                                               y_transform=y_transform
+                                               )
 
         y_pred = best_model.predict(X_all)
         negative_all = (y_pred < 0).sum()
@@ -313,7 +316,8 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                         data_name: str=None,
                         model_cls: BaseEstimator = None,
                         model_params: Dict[str, dict] = None,
-                        final_estim_cls: BaseEstimator = None # Только для Stacking
+                        final_estim_cls: BaseEstimator = None, # Только для Stacking
+                        y_transform = lambda y: y
                         ) -> Dict[str,
                                 Tuple[BaseEstimator, Any, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] ]:
 
@@ -323,7 +327,7 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     #----------------------------------------------------#
     # Подбор оптимальных параметров модели
     #----------------------------------------------------#
-    best_params, base_params, study = get_optimize_params(X_train=X_train, y_train=y_train,             X_test=X_test,
+    best_params, base_params, study = get_optimize_params(X_train=X_train, y_train=y_train,X_test=X_test,
                                             groups=groups,
                                             metric_1=metric_1,
                                             metric_2=metric_2,
@@ -338,7 +342,9 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                                             metric_best=metric_best,
                                             data_name=data_name,
                                             model_cls=model_cls,
-                                            model_params=model_params)
+                                            model_params=model_params,
+                                            y_transform=y_transform
+                                            )
 
     #----------------------------------------------------#
     # Обучение модели с подобранными параметрами
@@ -359,7 +365,9 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
                                                     val_size=val_size,
                                                     metric_best=metric_best,
                                                     data_name=data_name,
-                                                    groups=groups)
+                                                    groups=groups,
+                                                    y_transform=y_transform
+                                                    )
 
     #----------------------------------------------------#
     # Получение метрик
@@ -367,23 +375,27 @@ def get_optimize_results(X_train: pd.DataFrame, y_train: pd.Series,
     train_metrics, _ = model_train.get_prediction(X=X_train, y=y_train,
                                                 model=best_trained_model,
                                                 data_name=data_name,
-                                                metrics_type='train'
+                                                metrics_type='train',
+                                                y_transform=y_transform
                                                         )
     test_metrics, _ = model_train.get_prediction(X=X_test, y=y_test,
                                                 model=best_trained_model,
                                                 data_name=data_name,
-                                                metrics_type='test'
+                                                metrics_type='test',
+                                                y_transform=y_transform
                                                         )
     all_metrics, y_pred_all = model_train.get_prediction(X=X_all, y=y_all,
                                                 model=best_trained_model,
                                                 data_name=data_name,
-                                                metrics_type='all'
+                                                metrics_type='all',
+                                                y_transform=y_transform
                                                         )
     #----------------------------------------------------#
     # Добавление целевых переменных в датафрейм признаков
     #----------------------------------------------------#
     y_pred_all.name = 'y_pred'
     y_all.name = 'y_true'
+    y_all = y_transform(y_all)
 
     pred_df = pd.concat([X_all , y_all, y_pred_all], axis=1)
     # pred_df.drop_duplicates(inplace=True)
@@ -447,7 +459,8 @@ def get_optimize_several_results(data_dict: Dict[str, List[pd.DataFrame]],
                                 n_splits: int = 5,
                                 train_size: int = 48,
                                 val_size: int = 12,
-                                show_plots: bool = True
+                                show_plots: bool = True,
+                                y_transform = lambda y: y
                                 ) -> Dict[str, dict]:
 
     final_result_dict = {}
@@ -474,7 +487,8 @@ def get_optimize_several_results(data_dict: Dict[str, List[pd.DataFrame]],
                                                                 val_size=val_size,
                                                                 data_name=data_name,
                                                                 model_cls=model_cls,
-                                                                model_params=params
+                                                                model_params=params,
+                                                                y_transform=y_transform
                                                                 )
             train_metrics_lst.append(optim_result_dict['train_metrics'])
             val_metrics_lst.append(optim_result_dict['cv_metrics'])

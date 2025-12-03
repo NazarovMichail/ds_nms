@@ -288,7 +288,8 @@ def get_prediction(
     data_name: str = 'data_name',
     metrics_type: str = None,
     sarimax_train: bool = False,
-    sarimax_forecast: int = None
+    sarimax_forecast: int = None,
+    y_transform = lambda y: y
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """Возвращает датафрейм с метриками и массив предсказаний модели.
 
@@ -311,15 +312,18 @@ def get_prediction(
             start=y.index[0],
             X=X,
             return_conf_int=True)
+        y_pred = y_transform(y_pred)
     if sarimax_forecast is not None:
         y_pred, confidences = model.predict(
             n_periods=sarimax_forecast,
             X=X,
             return_conf_int=True)
+        y_pred = y_transform(y_pred)
     if sarimax_train is False and sarimax_forecast is None:
         y_pred_arr = model.predict(X)
         y_pred = pd.Series(data=y_pred_arr, index=X.index)
-
+        y_pred = y_transform(y_pred)
+    y = y_transform(y)
     RMSE = root_mean_squared_error(y, y_pred)
     MAE = mean_absolute_error(y, y_pred)
     RE = relative_error(y_pred=y_pred,
@@ -369,7 +373,8 @@ def train_cv(
     train_size: int = 48,                    # TimeSeriesSplit
     val_size: int = 12,                      # TimeSeriesSplit
     data_name: Union[str, None] = None,
-    groups: Union[pd.Series, np.ndarray, None] = None
+    groups: Union[pd.Series, np.ndarray, None] = None,
+    y_transform = lambda y: y
 ) -> Tuple[BaseEstimator, dict]:
     """
     Единая функция для обучения модели с разными схемами кросс-валидации:
@@ -509,9 +514,9 @@ def train_cv(
         model_i.fit(X_train, y_train)
 
         # Получаем метрики на train
-        metrics_train_df, y_train_pred = get_prediction(X_train, y_train, model_i)
+        metrics_train_df, y_train_pred = get_prediction(X_train, y_train, model_i, y_transform=y_transform)
         # Получаем метрики на val
-        metrics_val_df, y_val_pred = get_prediction(X_val, y_val, model_i)
+        metrics_val_df, y_val_pred = get_prediction(X_val, y_val, model_i,y_transform=y_transform)
 
         R2_train = metrics_train_df.get("R2", np.nan)
         RMSE_train = metrics_train_df["RMSE"]
@@ -543,7 +548,7 @@ def train_cv(
         results_dict['negative_val'].append(negative_val)
 
         models_history.append(model_i)
-        y_val_full.append(y_val)
+        y_val_full.append(y_transform(y_val))
         y_pred_full.append(y_val_pred)
 
     # -------------------------- #
@@ -667,7 +672,8 @@ def arima_train(
     suppress_warnings=True, # Подавить предупреждения
     stepwise=False,
     arima_params: dict = {},
-    show_info: bool = True
+    show_info: bool = True,
+    y_transform = lambda y: y
     ) -> pd.DataFrame:
     """Обучение модели SARIMAX с автоматическим подбором параметров
 
@@ -744,13 +750,17 @@ def arima_train(
                                 y=y_train[:],
                                 model=auto_model,
                                 sarimax_train=True,
-                                metrics_type='train')
+                                metrics_type='train',
+                                y_transform=y_transform
+                                )
     test_metrics, y_pred_test = get_prediction(
                                 X=X_test,
                                 y=y_test,
                                 model=auto_model,
                                 sarimax_forecast=len(y_test),
-                                metrics_type='test')
+                                metrics_type='test',
+                                y_transform=y_transform
+                                )
 
     #----------------------------------------------------#
     # Создание датафрейма с предсказаниями
@@ -802,6 +812,8 @@ def arima_predict(
     title: str = 'Прогноз',
     ylabel: str = 'Целевая переменная',
     show_conf: bool = True,
+    y_transform=lambda y: y
+
     ) -> pd.DataFrame:
     """Предсказание временного ряда на заданный период
 
@@ -833,7 +845,9 @@ def arima_predict(
                             y=y_train,
                             model=auto_model,
                             sarimax_train=True,
-                            metrics_type='train')
+                            metrics_type='train',
+                            y_transform=y_transform
+                            )
 
     n_periods = len(X_pred)
     y_pred, conf = auto_model.predict(

@@ -7,6 +7,14 @@ class ModelsParams():
     """
     def __init__(self):
 
+        self.linear = {
+            "fit_intercept": {
+                "type": "categorical",
+                "args": [[True, False]],
+                "kwargs": {}
+            },
+            "base_params": {}
+        }
 # $$\   $$\ $$\   $$\ $$\   $$\
 # $$ | $$  |$$$\  $$ |$$$\  $$ |
 # $$ |$$  / $$$$\ $$ |$$$$\ $$ |
