@@ -1,7 +1,7 @@
 from typing import Literal
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import kstest, kruskal
+from scipy.stats import kstest, kruskal, shapiro
 from statsmodels.tsa.stattools import adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
@@ -213,7 +213,7 @@ def test_normality_shapiro(residuals):
     """
     Тест Шапиро-Уилка - хорош для небольших выборок (n < 5000)
     """
-    stat, p_value = stats.shapiro(residuals)
+    stat, p_value = shapiro(residuals)
 
     print("=== Тест Шапиро-Уилка ===")
     print(f"Статистика: {stat:.4f}")
